@@ -1,4 +1,4 @@
-#ifdef __GNUC__
+﻿#ifdef __GNUC__
 #include <unistd.h>
 #endif
 #include <stdint.h>
@@ -168,16 +168,16 @@ void retro_set_environment(retro_environment_t cb)
     { option_mouse, "启用游戏内鼠标; disabled|enabled" },
     { option_lightgun, "光枪模式; 无|触屏|光枪" },
     { option_buttons_profiles, "游戏按键设置文件（须要重启）; enabled|disabled" },
-    { option_throttle, "帧数限制; disabled|enabled" },
-    { option_cheats, "作弊; disabled|enabled" },
+    { option_throttle, "启用速度限制; disabled|enabled" },
+    { option_cheats, "启用金手指; disabled|enabled" },
     { option_renderer, "替代的渲染方式; disabled|enabled" },
 
-    { option_softlist, "家用机模拟; enabled|disabled" },
+    { option_softlist, "启用家用机模拟; enabled|disabled" },
     { option_softlist_media, "家用机自动媒体类型; enabled|disabled" },
     { option_media, "媒体类型; rom|cart|flop|cdrm|cass|hard|serl|prin" },
     { option_bios, "启动到BIOS; disabled|enabled" },
 
-    { option_osd, "启动到OSD; disabled|enabled" },
+    { option_osd, "启动到OSD菜单; disabled|enabled" },
     { option_cli, "从命令行启动; disabled|enabled" },
     { option_res, "分辨率; 640x480|640x360|800x600|800x450|960x720|960x540|1024x768|1024x576|1280x960|1280x720|1600x1200|1600x900|1440x1080|1920x1080|1920x1440|2560x1440|2880x2160|3840x2160" },
     { option_mame_paths, "MAME INI文件路径; disabled|enabled" },
