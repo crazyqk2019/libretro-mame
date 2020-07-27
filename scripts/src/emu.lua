@@ -87,7 +87,7 @@ files {
 	MAME_DIR .. "src/emu/dipalette.h",
 	MAME_DIR .. "src/emu/dipty.cpp",
 	MAME_DIR .. "src/emu/dipty.h",
-	MAME_DIR .. "src/emu/dirom.cpp",
+	MAME_DIR .. "src/emu/dirom.ipp",
 	MAME_DIR .. "src/emu/dirom.h",
 	MAME_DIR .. "src/emu/dirtc.cpp",
 	MAME_DIR .. "src/emu/dirtc.h",
@@ -177,6 +177,8 @@ files {
 	MAME_DIR .. "src/emu/profiler.h",
 	MAME_DIR .. "src/emu/output.cpp",
 	MAME_DIR .. "src/emu/output.h",
+	MAME_DIR .. "src/emu/recording.cpp",
+	MAME_DIR .. "src/emu/recording.h",
 	MAME_DIR .. "src/emu/render.cpp",
 	MAME_DIR .. "src/emu/render.h",
 	MAME_DIR .. "src/emu/rendfont.cpp",
@@ -242,6 +244,8 @@ files {
 	MAME_DIR .. "src/emu/debug/dvtext.h",
 	MAME_DIR .. "src/emu/debug/express.cpp",
 	MAME_DIR .. "src/emu/debug/express.h",
+	MAME_DIR .. "src/emu/debug/points.cpp",
+	MAME_DIR .. "src/emu/debug/points.h",
 	MAME_DIR .. "src/emu/debug/textbuf.cpp",
 	MAME_DIR .. "src/emu/debug/textbuf.h",
 	MAME_DIR .. "src/emu/drivers/empty.cpp",
@@ -284,7 +288,7 @@ dependency {
 -- RETRO HACK : use old smallui ui.bdc
 if _OPTIONS["osd"]=="retro" then
 custombuildtask {
-	{ MAME_DIR .. "src/osd/libretro/libretro-internal/ui.bdc", GEN_DIR .. "emu/uismall.fh",     {  MAME_DIR .. "scripts/build/file2str.py" }, {"@echo Converting ui.bdc...", PYTHON .. " $(1) $(<) $(@) font_uismall uint8_t" }},
+	{ MAME_DIR .. "src/osd/libretro/libretro-internal/ui.bdc", GEN_DIR .. "emu/uismall.fh", {  MAME_DIR .. "scripts/build/file2str.py" }, {"@echo Converting ui.bdc...", PYTHON .. " $(1) $(<) $(@) font_uismall uint8_t" } },
 }
 else
 custombuildtask {
@@ -324,5 +328,3 @@ pchsource(MAME_DIR .. "src/emu/drivers/empty.cpp")
 dependency {
 	{ "$(OBJDIR)/src/emu/drivers/empty.o", "$(GCH)", true  },
 }
-
-
