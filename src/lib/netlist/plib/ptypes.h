@@ -13,6 +13,7 @@
 #include <limits>
 #include <string>
 #include <type_traits>
+#include <stdint.h>
 
 #if (PUSE_FLOAT128)
 #if defined(__has_include)

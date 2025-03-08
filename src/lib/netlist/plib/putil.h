@@ -16,6 +16,7 @@
 #include <initializer_list>
 #include <sstream>
 #include <vector>
+#include <cstdint>
 
 #define PSTRINGIFY_HELP(y) # y
 #define PSTRINGIFY(x) PSTRINGIFY_HELP(x)
