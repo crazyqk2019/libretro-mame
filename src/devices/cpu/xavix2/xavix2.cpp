@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "xavix2.h"
 #include "xavix2d.h"
-#include "debugger.h"
 
 DEFINE_DEVICE_TYPE(XAVIX2, xavix2_device, "xavix2", "Xavix 2 CPU")
 
@@ -23,7 +22,6 @@ void xavix2_device::device_start()
 
 	state_add(STATE_GENPC,     "GENPC",     m_pc).callexport().noshow();
 	state_add(STATE_GENPCBASE, "CURPC",     m_pc).callexport().noshow();
-	state_add(STATE_GENSP,     "GENSP",     m_r[7]).noshow();
 	state_add(STATE_GENFLAGS,  "GENFLAGS",  m_hr[4]).callimport().formatstr("%5s").noshow();
 	state_add(XAVIX2_PC,       "PC",        m_pc).callimport();
 	state_add(XAVIX2_FLAGS,    "FLAGS",     m_hr[4]).callimport();
@@ -138,16 +136,11 @@ uint32_t xavix2_device::execute_max_cycles() const noexcept
 	return 5;
 }
 
-uint32_t xavix2_device::execute_input_lines() const noexcept
-{
-	return 1;
-}
-
 u32 xavix2_device::check_interrupt(u32 cpc)
 {
 	if(m_int_line && ((m_hr[4] & F_I) || m_wait)) {
-		standard_irq_callback(0);
 		m_ilr1 = m_wait ? cpc + 1 : cpc;
+		standard_irq_callback(0, m_ilr1);
 		m_wait = false;
 		m_ei_count = 0;
 		m_if1 = m_hr[4];
@@ -198,7 +191,7 @@ void xavix2_device::execute_run()
 			if(!m_ei_count)
 				m_pc = check_interrupt(m_pc);
 		}
-		if(machine().debug_flags & DEBUG_FLAG_ENABLED)
+		if(debugger_enabled())
 			debugger_instruction_hook(m_pc);
 
 		u32 opcode = m_program_cache.read_byte(m_pc) << 24;

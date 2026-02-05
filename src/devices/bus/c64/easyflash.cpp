@@ -48,7 +48,7 @@ static INPUT_PORTS_START( c64_easyflash )
 	PORT_DIPSETTING(    0x01, "Boot" )
 
 	PORT_START("RESET")
-	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Reset") PORT_CODE(KEYCODE_F11) PORT_WRITE_LINE_DEVICE_MEMBER(DEVICE_SELF_OWNER, c64_expansion_slot_device, reset_w)
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Reset") PORT_CODE(KEYCODE_F11) PORT_WRITE_LINE_DEVICE_MEMBER(DEVICE_SELF_OWNER, FUNC(c64_expansion_slot_device::reset_w))
 INPUT_PORTS_END
 
 
@@ -77,7 +77,7 @@ c64_easyflash_cartridge_device::c64_easyflash_cartridge_device(const machine_con
 	m_flash_roml(*this, AM29F040_0_TAG),
 	m_flash_romh(*this, AM29F040_1_TAG),
 	m_jp1(*this, "JP1"),
-	m_ram(*this, "ram"),
+	m_ram(*this, "ram", 0x100, ENDIANNESS_LITTLE),
 	m_bank(0),
 	m_mode(0)
 {
@@ -90,9 +90,6 @@ c64_easyflash_cartridge_device::c64_easyflash_cartridge_device(const machine_con
 
 void c64_easyflash_cartridge_device::device_start()
 {
-	// allocate memory
-	m_ram.allocate(0x100);
-
 	// state saving
 	save_item(NAME(m_bank));
 	save_item(NAME(m_mode));

@@ -9,16 +9,21 @@
 ***************************************************************************/
 
 #include "emu.h"
-#include "express.h"
 #include "debugvw.h"
-#include "dvtext.h"
-#include "dvstate.h"
-#include "dvdisasm.h"
-#include "dvmemory.h"
-#include "dvbpoints.h"
-#include "dvwpoints.h"
+
 #include "debugcpu.h"
+#include "dvbpoints.h"
+#include "dvdisasm.h"
+#include "dvepoints.h"
+#include "dvmemory.h"
+#include "dvrpoints.h"
+#include "dvstate.h"
+#include "dvtext.h"
+#include "dvwpoints.h"
+#include "express.h"
+
 #include "debugger.h"
+
 #include <cctype>
 
 
@@ -250,6 +255,7 @@ void debug_view::adjust_visible_x_for_cursor()
 		m_topleft.x = m_cursor.x;
 	else if (m_cursor.x >= m_topleft.x + m_visible.x - 1)
 		m_topleft.x = m_cursor.x - m_visible.x + 2;
+	m_topleft.x = (std::max)((std::min)(m_topleft.x, m_total.x - m_visible.x), 0);
 }
 
 
@@ -265,6 +271,7 @@ void debug_view::adjust_visible_y_for_cursor()
 		m_topleft.y = m_cursor.y;
 	else if (m_cursor.y >= m_topleft.y + m_visible.y - 1)
 		m_topleft.y = m_cursor.y - m_visible.y + 2;
+	m_topleft.y = (std::max)((std::min)(m_topleft.y, m_total.y - m_visible.y), 0);
 }
 
 
@@ -326,7 +333,7 @@ debug_view_manager::~debug_view_manager()
 	{
 		debug_view *oldhead = m_viewlist;
 		m_viewlist = oldhead->m_next;
-		global_free(oldhead);
+		delete oldhead;
 	}
 }
 
@@ -340,25 +347,31 @@ debug_view *debug_view_manager::alloc_view(debug_view_type type, debug_view_osd_
 	switch (type)
 	{
 		case DVT_CONSOLE:
-			return append(global_alloc(debug_view_console(machine(), osdupdate, osdprivate)));
+			return append(new debug_view_console(machine(), osdupdate, osdprivate));
 
 		case DVT_STATE:
-			return append(global_alloc(debug_view_state(machine(), osdupdate, osdprivate)));
+			return append(new debug_view_state(machine(), osdupdate, osdprivate));
 
 		case DVT_DISASSEMBLY:
-			return append(global_alloc(debug_view_disasm(machine(), osdupdate, osdprivate)));
+			return append(new debug_view_disasm(machine(), osdupdate, osdprivate));
 
 		case DVT_MEMORY:
-			return append(global_alloc(debug_view_memory(machine(), osdupdate, osdprivate)));
+			return append(new debug_view_memory(machine(), osdupdate, osdprivate));
 
 		case DVT_LOG:
-			return append(global_alloc(debug_view_log(machine(), osdupdate, osdprivate)));
+			return append(new debug_view_log(machine(), osdupdate, osdprivate));
 
 		case DVT_BREAK_POINTS:
-			return append(global_alloc(debug_view_breakpoints(machine(), osdupdate, osdprivate)));
+			return append(new debug_view_breakpoints(machine(), osdupdate, osdprivate));
 
 		case DVT_WATCH_POINTS:
-			return append(global_alloc(debug_view_watchpoints(machine(), osdupdate, osdprivate)));
+			return append(new debug_view_watchpoints(machine(), osdupdate, osdprivate));
+
+		case DVT_REGISTER_POINTS:
+			return append(new debug_view_registerpoints(machine(), osdupdate, osdprivate));
+
+		case DVT_EXCEPTION_POINTS:
+			return append(new debug_view_exceptionpoints(machine(), osdupdate, osdprivate));
 
 		default:
 			fatalerror("Attempt to create invalid debug view type %d\n", type);
@@ -378,7 +391,7 @@ void debug_view_manager::free_view(debug_view &view)
 		if (*viewptr == &view)
 		{
 			*viewptr = view.m_next;
-			global_free(&view);
+			delete &view;
 			break;
 		}
 }
@@ -487,23 +500,37 @@ void debug_view_expression::set_context(symbol_table *context)
 bool debug_view_expression::recompute()
 {
 	bool changed = m_dirty;
+	bool failed = false;
 
 	// if dirty, re-evaluate
 	if (m_dirty)
 	{
-		std::string oldstring(m_parsed.original_string());
+		std::string const oldstring(m_parsed.original_string());
 		try
 		{
-			m_parsed.parse(m_string.c_str());
+			m_parsed.parse(m_string);
 		}
-		catch (expression_error &)
+		catch (expression_error const &)
 		{
-			m_parsed.parse(oldstring.c_str());
+			failed = true;
+		}
+		if (failed && (oldstring != m_string))
+		{
+			// parsing failed on changing the expression input
+			try
+			{
+				// try falling back to the previous string
+				m_parsed.parse(oldstring);
+				failed = false;
+			}
+			catch (expression_error const &)
+			{
+			}
 		}
 	}
 
-	// if we have a parsed expression, evalute it
-	if (!m_parsed.is_empty())
+	// if we have a parsed expression, evaluate it
+	if (!failed && !m_parsed.is_empty())
 	{
 		// recompute the value of the expression
 		try
@@ -515,7 +542,7 @@ bool debug_view_expression::recompute()
 				changed = true;
 			}
 		}
-		catch (expression_error &)
+		catch (expression_error const &)
 		{
 		}
 	}

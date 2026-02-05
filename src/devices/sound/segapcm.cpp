@@ -58,10 +58,11 @@ void segapcm_device::device_clock_changed()
 
 
 //-------------------------------------------------
-//  rom_bank_updated - the rom bank has changed
+//  rom_bank_pre_change - refresh the stream if the
+//  ROM banking changes
 //-------------------------------------------------
 
-void segapcm_device::rom_bank_updated()
+void segapcm_device::rom_bank_pre_change()
 {
 	m_stream->update();
 }
@@ -71,12 +72,8 @@ void segapcm_device::rom_bank_updated()
 //  sound_stream_update - handle a stream update
 //-------------------------------------------------
 
-void segapcm_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void segapcm_device::sound_stream_update(sound_stream &stream)
 {
-	/* clear the buffers */
-	memset(outputs[0], 0, samples*sizeof(*outputs[0]));
-	memset(outputs[1], 0, samples*sizeof(*outputs[1]));
-
 	// reg      function
 	// ------------------------------------------------
 	// 0x00     ?
@@ -113,7 +110,7 @@ void segapcm_device::sound_stream_update(sound_stream &stream, stream_sample_t *
 			int i;
 
 			/* loop over samples on this channel */
-			for (i = 0; i < samples; i++)
+			for (i = 0; i < stream.samples(); i++)
 			{
 				int8_t v;
 
@@ -132,8 +129,8 @@ void segapcm_device::sound_stream_update(sound_stream &stream, stream_sample_t *
 				v = read_byte(offset + (addr >> 8)) - 0x80;
 
 				/* apply panning and advance */
-				outputs[0][i] += v * (regs[2] & 0x7f);
-				outputs[1][i] += v * (regs[3] & 0x7f);
+				stream.add_int(0, i, v * (regs[2] & 0x7f), 32768);
+				stream.add_int(1, i, v * (regs[3] & 0x7f), 32768);
 				addr = (addr + regs[7]) & 0xffffff;
 			}
 

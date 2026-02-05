@@ -11,9 +11,11 @@
 
 **********************************************************************/
 
-
 #include "emu.h"
 #include "solidisk.h"
+
+#include "formats/acorn_dsk.h"
+#include "formats/fsd_dsk.h"
 
 
 //**************************************************************************
@@ -29,12 +31,14 @@ DEFINE_DEVICE_TYPE(BBC_STLDFDC_1, bbc_stldfdc_1_device, "bbc_stldfdc_1", "Solidi
 //  FLOPPY_FORMATS( floppy_formats )
 //-------------------------------------------------
 
-FLOPPY_FORMATS_MEMBER( bbc_stlfdc_device::floppy_formats )
-	FLOPPY_ACORN_SSD_FORMAT,
-	FLOPPY_ACORN_DSD_FORMAT,
-	FLOPPY_ACORN_ADFS_OLD_FORMAT,
-	FLOPPY_FSD_FORMAT
-FLOPPY_FORMATS_END
+void bbc_stlfdc_device::floppy_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_ACORN_SSD_FORMAT);
+	fr.add(FLOPPY_ACORN_DSD_FORMAT);
+	fr.add(FLOPPY_ACORN_ADFS_OLD_FORMAT);
+	fr.add(FLOPPY_FSD_FORMAT);
+}
 
 static void bbc_floppies_525(device_slot_interface &device)
 {
@@ -51,7 +55,7 @@ static void bbc_floppies_525(device_slot_interface &device)
 
 INPUT_PORTS_START( stldfdc )
 	PORT_START("DFDC")
-	PORT_CONFNAME(0x01, 0x00, "Dual FDC Select") PORT_CHANGED_MEMBER(DEVICE_SELF, bbc_stlfdc_device, fdc_changed, 0)
+	PORT_CONFNAME(0x01, 0x00, "Dual FDC Select") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(bbc_stlfdc_device::fdc_changed), 0)
 	PORT_CONFSETTING(0x00, "8271")
 	PORT_CONFSETTING(0x01, "1770")
 INPUT_PORTS_END
@@ -224,14 +228,14 @@ INPUT_CHANGED_MEMBER(bbc_stlfdc_device::fdc_changed)
 	device_reset();
 }
 
-WRITE_LINE_MEMBER(bbc_stlfdc_device::motor_w)
+void bbc_stlfdc_device::motor_w(int state)
 {
 	if (m_floppy[0]->get_device()) m_floppy[0]->get_device()->mon_w(!state);
 	if (m_floppy[1]->get_device()) m_floppy[1]->get_device()->mon_w(!state);
 	m_i8271->ready_w(!state);
 }
 
-WRITE_LINE_MEMBER(bbc_stlfdc_device::side_w)
+void bbc_stlfdc_device::side_w(int state)
 {
 	if (m_floppy[0]->get_device()) m_floppy[0]->get_device()->ss_w(state);
 	if (m_floppy[1]->get_device()) m_floppy[1]->get_device()->ss_w(state);

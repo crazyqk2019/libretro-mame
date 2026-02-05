@@ -19,9 +19,10 @@
 
 #include "peribox.h"
 #include "machine/74259.h"
+#include "machine/74610.h"
 #include "machine/ram.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 class sams_memory_expansion_device : public device_t, public device_ti99_peribox_card_interface
 {
@@ -30,28 +31,33 @@ public:
 	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 
-	void crureadz(offs_t offset, uint8_t *value) override;
+	void crureadz(offs_t offset, uint8_t *value) override { };
 	void cruwrite(offs_t offset, uint8_t data) override;
 
 protected:
-	void device_start() override;
-	void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
-	virtual void device_add_mconfig(machine_config &config) override;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
+	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
+
+	void reset_in(int state) override;
 
 private:
-	DECLARE_WRITE_LINE_MEMBER(access_mapper_w);
-	DECLARE_WRITE_LINE_MEMBER(map_mode_w);
+	required_device<ls259_device> m_crulatch_u8;
+	required_device<ttl74612_device> m_mapper_u12;
+	required_device<ram_device> m_ram_u13;
+	required_device<ram_device> m_ram_u14;
 
-	// Console RAM
-	required_device<ram_device> m_ram;
-	required_device<ls259_device> m_crulatch;
-	int     m_mapper[16];
-	bool    m_map_mode;
-	bool    m_access_mapper;
+	line_state memsel(offs_t offset);
+	line_state mapsel(offs_t offset);
+
+	int m_select_bit;
+
+	uint8_t m_upper_bits;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_SAMSMEM, bus::ti99::peb, sams_memory_expansion_device)
 

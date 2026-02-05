@@ -22,6 +22,10 @@ void xxx_state::kbd_put(u8 data)
     (if your machine uses function keys, add your conversion code here)
 }
 
+In a device, at the top of the device's .cpp file in the appropriate spot:
+
+#include "machine/keyboard.ipp"
+
 ***************************************************************************/
 
 #include "emu.h"
@@ -257,6 +261,10 @@ generic_keyboard_device::generic_keyboard_device(
 {
 }
 
+generic_keyboard_device::~generic_keyboard_device()
+{
+}
+
 
 generic_keyboard_device::generic_keyboard_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock)
 	: generic_keyboard_device(mconfig, GENERIC_KEYBOARD, tag, owner, clock)
@@ -272,7 +280,7 @@ ioport_constructor generic_keyboard_device::device_input_ports() const
 
 void generic_keyboard_device::device_start()
 {
-	m_keyboard_cb.resolve();
+	m_keyboard_cb.resolve_safe();
 
 	save_item(NAME(m_last_modifiers));
 }
@@ -303,7 +311,6 @@ void generic_keyboard_device::key_repeat(u8 row, u8 column)
 
 void generic_keyboard_device::send_key(u8 code)
 {
-	assert(!m_keyboard_cb.isnull());
 	m_keyboard_cb(code);
 }
 

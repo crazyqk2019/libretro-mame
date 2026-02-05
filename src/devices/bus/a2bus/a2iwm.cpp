@@ -12,9 +12,12 @@
 *********************************************************************/
 
 #include "emu.h"
-#include "formats/ap2_dsk.h"
-#include "machine/applefdintf.h"
 #include "a2iwm.h"
+
+#include "machine/applefdintf.h"
+#include "formats/ap2_dsk.h"
+#include "formats/as_dsk.h"
+
 
 //**************************************************************************
 //  GLOBAL VARIABLES
@@ -90,6 +93,11 @@ void a2bus_iwm_card_device::device_start()
 
 void a2bus_iwm_device::device_reset()
 {
+}
+
+void a2bus_iwm_device::reset_from_bus()
+{
+	m_iwm->reset();
 }
 
 /*-------------------------------------------------

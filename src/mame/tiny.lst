@@ -1,39 +1,95 @@
 // license:BSD-3-Clause
 // copyright-holders:Aaron Giles
-/******************************************************************************
+/*******************************************************************************
 
     tiny.lst
 
-    List of all enabled drivers in the system. This file is parsed by
-    makelist.exe, sorted, and output as C code describing the drivers.
+    List of all enabled drivers for compile target. This is not an automatically
+    generated file, and it should be manually updated when a new driver is added.
 
-******************************************************************************/
+*******************************************************************************/
 
-robby           // (c) 1981 Bally Midway
-gridlee         // [1983 Videa] prototype - no copyright notice
-alienar         // (c) 1985 Duncan Brown
+@source:exidy/carpolo.cpp
+carpolo
 
-carpolo         // (c) 1977 Exidy
-sidetrac        // (c) 1979 Exidy
-targ            // (c) 1980 Exidy
-spectar         // (c) 1980 Exidy
-teetert         // (c) 1982 Exidy
-hardhat         // (c) 1982
-fax             // (c) 1983
-fax2            // (c) 1983
-circus          // (c) 1977 Exidy
-robotbwl        // (c) 197? Exidy
-crash           // (c) 1979 Exidy
-ripcord         // (c) 1979 Exidy
-starfire        // (c) 1979 Exidy
-starfirea       // (c) 1979 Exidy
-fireone         // (c) 1979 Exidy
-starfir2        // (c) 1979 Exidy
-victory         // (c) 1982
-victorba        // (c) 1982
-topgunnr        // (c) 1986
+@source:exidy/circus.cpp
+circus
+circuso
+robotbwl
+crash
+ripcord
 
-looping         // (c) 1982 Video Games GMBH
-supertnk        // (c) 1981 VIDEO GAMES GmbH, W.-GERMANY
+@source:exidy/exidy.cpp
+sidetrac
+targ
+spectar
+teetert
+hardhat
+fax
+fax2
 
-wrally          // (c) 1993 - Ref 930705
+@source:exidy/starfire.cpp
+starfire
+starfirea
+fireone
+starfir2
+
+@source:exidy/vertigo.cpp
+topgunnr
+
+@source:exidy/victory.cpp
+victory
+victorba
+
+@source:gaelco/wrally.cpp
+wrally
+
+@source:midway/astrocde.cpp
+robby
+
+@source:midway/gridlee.cpp
+gridlee
+
+@source:midway/williams.cpp
+alienar
+
+@source:misc/goldnpkr.cpp
+witchgme
+witchjol
+wldwitch
+wldwitcha
+wldwitchc
+wldwitchd
+wldwitchf
+wldwitchg
+wldwitchh
+wldwitchi
+wldwitchj
+wldwitchk
+wldwitchl
+wldwitchm
+wldwitchn
+wldwitcho
+wldwitchp
+wldwitchq
+wldwitchr
+wldwitchs
+wldwitcht
+wldwitchu
+wldwitchv
+wupndown
+wupndowna
+wupndownb
+wupndownc
+wupndownd
+wstrike
+wstrikea
+wtchjack
+wtchjacka
+wtchjackb
+
+@source:videogames/looping.cpp
+looping
+
+@source:videogames/supertnk.cpp
+supertnk

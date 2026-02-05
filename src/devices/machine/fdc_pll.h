@@ -17,8 +17,8 @@ public:
 
 	attotime write_start_time;
 	attotime write_buffer[32];
-	int write_position;
-	int freq_hist;
+	int write_position = 0;
+	int freq_hist = 0;
 
 	void set_clock(const attotime &period);
 	void reset(const attotime &when);
@@ -29,8 +29,6 @@ public:
 	void start_writing(const attotime &tm);
 	void commit(floppy_image_device *floppy, const attotime &tm);
 	void stop_writing(floppy_image_device *floppy, const attotime &tm);
-
-	std::string tts(attotime tm);
 };
 
 #endif // MAME_MACHINE_FDC_PLL_H

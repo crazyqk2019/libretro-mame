@@ -1,5 +1,5 @@
 // license:BSD-3-Clause
-// copyright-holders:Ville Linde, Angelo Salese, hap
+// copyright-holders:Ville Linde, Angelo Salese
 
 #define SET_Z8(r)           (m_ccr |= ((uint8_t)r == 0) ? CC_Z : 0)
 #define SET_Z16(r)          (m_ccr |= ((uint16_t)r == 0) ? CC_Z : 0)
@@ -1952,7 +1952,7 @@ void HC11OP(dec_indy)()
 /* DES              0x34 */
 void HC11OP(des)()
 {
-	m_ix--;
+	m_sp--;
 	CYCLES(3);
 }
 
@@ -4180,28 +4180,14 @@ void HC11OP(tys)()
 /* WAI              0x3E */
 void HC11OP(wai)()
 {
-	if(m_wait_state == 0)
-	{
-		/* TODO: the following is bogus, pushes regs HERE in an instruction that wants an irq to go out? */
-		PUSH16(m_pc);
-		PUSH16(m_iy);
-		PUSH16(m_ix);
-		PUSH8(REG_A);
-		PUSH8(REG_B);
-		PUSH8(m_ccr);
-		CYCLES(14);
-		m_wait_state = 1;
-	}
-	if(m_wait_state == 1)
-	{
-		SET_PC(m_ppc); // wait for an exception
-		CYCLES(1);
-	}
-	if(m_wait_state == 2)
-	{
-		m_wait_state = 0;
-		CYCLES(1);
-	}
+	PUSH16(m_pc);
+	PUSH16(m_iy);
+	PUSH16(m_ix);
+	PUSH8(REG_A);
+	PUSH8(REG_B);
+	PUSH8(m_ccr);
+	CYCLES(14);
+	m_wait_state = 1;
 }
 
 /* XGDX             0x8F */

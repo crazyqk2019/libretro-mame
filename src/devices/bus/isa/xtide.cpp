@@ -11,7 +11,7 @@ Card has jumpers for I/O base address, and ROM base address, the default
 rom images being we'll emulate an I/O base of 0x300 and a ROM base of 0xC8000.
 
 If the I/O address is changed then you will need to use XTIDECFG to configure the ROM.
-The opensource bios is available from :
+The opensource BIOS is available from :
 http://code.google.com/p/xtideuniversalbios/
 
 The data high register is connected to a pair of latches that have the MSB of
@@ -109,14 +109,7 @@ void xtide_device::write(offs_t offset, uint8_t data)
 	}
 }
 
-uint8_t xtide_device::eeprom_read(offs_t offset)
-{
-	address_space &space = m_isa->memspace();
-
-	return m_eeprom->read(space, offset);
-}
-
-WRITE_LINE_MEMBER(xtide_device::ide_interrupt)
+void xtide_device::ide_interrupt(int state)
 {
 	switch (m_irq_number)
 	{
@@ -182,10 +175,10 @@ ROM_START( xtide )
 
 	ROM_DEFAULT_BIOS("xub200b3xt")
 
-	ROM_SYSTEM_BIOS( 0, "xtide_010", "Hargle's Bios v0.10" )
+	ROM_SYSTEM_BIOS( 0, "xtide_010", "Hargle's BIOS v0.10" )
 	ROMX_LOAD( "oprom.bin,v0.10", 0x000000, 0x002000, CRC(56075ac2) SHA1(f55285a1ed8414c8ddf2364421552e0548cf548f), ROM_BIOS(0) )
 
-	ROM_SYSTEM_BIOS( 1, "xtide_011", "Hargle's Bios v0.11" )
+	ROM_SYSTEM_BIOS( 1, "xtide_011", "Hargle's BIOS v0.11" )
 	ROMX_LOAD( "oprom.bin,v0.11", 0x000000, 0x002000, CRC(c5fee6c5) SHA1(cc3a015d8d36208d99de8500c962828d2daea939), ROM_BIOS(1) )
 
 	ROM_SYSTEM_BIOS( 2, "xub110xt", "XTIDE_Universal_BIOS_v1.1.0 (XT)" )
@@ -329,7 +322,7 @@ void xtide_device::device_reset()
 	int io_address      = ((ioport("IO_ADDRESS")->read() & 0x0F) * 0x20) + 0x200;
 	m_irq_number        = (ioport("IRQ")->read() & 0x07);
 
-	m_isa->install_memory(base_address, base_address + 0x1fff, read8sm_delegate(*this, FUNC(xtide_device::eeprom_read)), write8sm_delegate(*m_eeprom, FUNC(eeprom_parallel_28xx_device::write)));
+	m_isa->install_memory(base_address, base_address + 0x1fff, read8m_delegate(*m_eeprom, FUNC(eeprom_parallel_28xx_device::read)), write8sm_delegate(*m_eeprom, FUNC(eeprom_parallel_28xx_device::write)));
 	m_isa->install_device(io_address, io_address + 0xf, read8sm_delegate(*this, FUNC(xtide_device::read)), write8sm_delegate(*this, FUNC(xtide_device::write)));
 
 	//logerror("xtide_device::device_reset(), bios_base=0x%5X to 0x%5X, I/O=0x%3X, IRQ=%d\n",base_address,base_address + (16*1024)  -1 ,io_address,irq);

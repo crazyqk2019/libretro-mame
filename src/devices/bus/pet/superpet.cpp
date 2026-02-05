@@ -173,7 +173,7 @@ superpet_device::superpet_device(const machine_config &mconfig, const char *tag,
 	m_acia(*this, MOS6551_TAG),
 	m_dongle(*this, MOS6702_TAG),
 	m_rom(*this, M6809_TAG),
-	m_ram(*this, "ram"),
+	m_ram(*this, "ram", 0x10000, ENDIANNESS_LITTLE),
 	m_io_sw1(*this, "SW1"),
 	m_io_sw2(*this, "SW2"),
 	m_system(0),
@@ -191,9 +191,6 @@ superpet_device::superpet_device(const machine_config &mconfig, const char *tag,
 
 void superpet_device::device_start()
 {
-	// allocate memory
-	m_ram.allocate(0x10000);
-
 	// state saving
 	save_item(NAME(m_system));
 	save_item(NAME(m_bank));
@@ -420,7 +417,7 @@ void superpet_device::write(offs_t offset, uint8_t data)
 //  acia_irq_w -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( superpet_device::acia_irq_w )
+void superpet_device::acia_irq_w(int state)
 {
 	m_acia_irq = state;
 

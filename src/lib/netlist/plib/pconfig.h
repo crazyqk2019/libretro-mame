@@ -1,4 +1,4 @@
-// license:GPL-2.0+
+// license:BSD-3-Clause
 // copyright-holders:Couriersud
 
 #ifndef PCONFIG_H_
@@ -8,7 +8,7 @@
 /// \file pconfig.h
 ///
 
-/// \brief More accurate measurements if you processor supports RDTSCP.
+/// \brief More accurate measurements the processor supports RDTSCP.
 ///
 #ifndef PHAS_RDTSCP
 #define PHAS_RDTSCP (0)
@@ -41,7 +41,11 @@
 /// Set this to one if you want to use aligned storage optimizations.
 ///
 #ifndef PUSE_ALIGNED_OPTIMIZATIONS
+#if defined(__EMSCRIPTEN__)
 #define PUSE_ALIGNED_OPTIMIZATIONS (0)
+#else
+#define PUSE_ALIGNED_OPTIMIZATIONS (1)
+#endif
 #endif
 
 /// \brief Use aligned allocations.
@@ -63,31 +67,30 @@
 
 /// \brief Number of bytes for cache line alignment
 ///
-#define PALIGN_CACHELINE        (16)
+#define PALIGN_CACHELINE        (64)
 
 /// \brief Number of bytes for vector alignment
 ///
-#define PALIGN_VECTOROPT        (16)
+#define PALIGN_VECTOROPT        (32)
 
+#define PALIGN_MIN_SIZE         (16)
+
+#if (PUSE_ALIGNED_OPTIMIZATIONS)
 #define PALIGNAS_CACHELINE()    PALIGNAS(PALIGN_CACHELINE)
 #define PALIGNAS_VECTOROPT()    PALIGNAS(PALIGN_VECTOROPT)
+#else
+#define PALIGNAS_CACHELINE()
+#define PALIGNAS_VECTOROPT()
+#endif
 
-// FIXME: Breaks mame build on windows mingw due to -Wattribute
-//        also triggers -Wattribute on ARM
+// FIXME: Breaks mame build on windows mingw due to `-Wattribute`
+//        also triggers `-Wattribute` on ARM
 //        This is fixed on mingw version 10
 // FIXME: no error on cross-compile - need further checks
 #if defined(__GNUC__) && ((defined(_WIN32) && __GNUC__ < 10) || defined(__arm__) || defined(__ARMEL__))
 #define PALIGNAS(x)
 #else
 #define PALIGNAS(x) alignas(x)
-#endif
-
-/// \brief nvcc build flag.
-///
-/// Set this to 101 if you are building with NVIDIA nvcc 10.1
-///
-#ifndef NVCCBUILD
-#define NVCCBUILD (0)
 #endif
 
 // ============================================================
@@ -104,29 +107,20 @@
 //
 //============================================================
 
-
-#if (NVCCBUILD > 0)
-	#if NVCCBUILD == 101
-		#define NVCC_CONSTEXPR constexpr
-	#else
-		#define NVCC_CONSTEXPR constexpr
-	#endif
-	#if __cplusplus != 201402L
-		#error nvcc - use c++14 to compile
-	#endif
+#if defined(_MSC_VER)
+	// Ok
+#elif __cplusplus == 201103L
+	#error c++11 not supported - you need c++17
+#elif __cplusplus == 201402L
+	#error c++14 not supported - you need c++17
+#elif __cplusplus == 201703L
+	// Ok
+#elif __cplusplus == 201709L
+	// Ok g++-9 -std=c++2a
+#elif __cplusplus == 202002L
+	// Ok clang++-13 -std=c++2a
 #else
-	#define NVCC_CONSTEXPR constexpr
-	#if __cplusplus == 201103L
-		#error c++11 not supported - you need c++14
-	#elif __cplusplus == 201402L
-		// Ok
-	#elif __cplusplus == 201703L
-		// Ok
-	#elif defined(_MSC_VER)
-		// Ok
-	#else
-		#error "C++ version not supported"
-	#endif
+	#error "C++ version not supported"
 #endif
 
 

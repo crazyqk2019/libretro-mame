@@ -1,4 +1,4 @@
-// license:GPL-2.0+
+// license:BSD-3-Clause
 // copyright-holders:Couriersud
 
 #ifndef PRANDOM_H_
@@ -101,7 +101,7 @@ namespace plib
 		}
 
 	private:
-		void twist()
+		void twist() noexcept
 		{
 			const T lowest_w(~T(0) >> (sizeof(T)*8 - w));
 			const T lower_mask((T(1) << r) - 1); // That is, the binary number of r 1's
@@ -121,10 +121,10 @@ namespace plib
 	};
 
 	template <typename FT, typename T>
-	FT normalize_uniform(T &p, FT m = constants<FT>::one(), FT b = constants<FT>::zero())
+	FT normalize_uniform(T &p, FT m = constants<FT>::one(), FT b = constants<FT>::zero()) noexcept
 	{
-		const auto mmin(narrow_cast<FT>(p.min()));
-		const auto mmax(narrow_cast<FT>(p.max()));
+		constexpr const FT mmin(narrow_cast<FT>(T::min()));
+		constexpr const FT mmax(narrow_cast<FT>(T::max()));
 		// -> 0 to a
 		return (narrow_cast<FT>(p())- mmin) / (mmax - mmin) * m - b;
 	}
@@ -145,10 +145,9 @@ namespace plib
 		}
 
 		template <typename ST>
-		void save_state(ST &st)
+		void save_state([[maybe_unused]] ST &st)
 		{
-			plib::unused_var(st);
-			/* no state to save */
+			// no state to save
 		}
 
 	private:
@@ -191,8 +190,8 @@ namespace plib
 				FT v2;
 				do
 				{
-					v1 = normalize_uniform(p, constants<FT>::two(), constants<FT>::one()); // [-1..1[
-					v2 = normalize_uniform(p, constants<FT>::two(), constants<FT>::one()); // [-1..1[
+					v1 = normalize_uniform(p, constants<FT>::two(), constants<FT>::one()); // [-1..1]
+					v2 = normalize_uniform(p, constants<FT>::two(), constants<FT>::one()); // [-1..1]
 					s = v1 * v1 + v2 * v2;
 				} while (s >= constants<FT>::one());
 				if (s == constants<FT>::zero())
@@ -206,7 +205,7 @@ namespace plib
 					// double: 1.000000e-305
 					// float: 9.999999e-37
 					// FIXME: with 128 bit randoms log(s)/w will fail 1/(2^128) ~ 2.9e-39
-					const auto m(m_stddev * plib::sqrt(-constants<FT>::two() * plib::log(s)/s));
+					const FT m(m_stddev * plib::sqrt(-constants<FT>::two() * plib::log(s)/s));
 					m_buf[i] = /*mean+*/ m * v1;
 					m_buf[i+1] = /*mean+*/ m * v2;
 				}

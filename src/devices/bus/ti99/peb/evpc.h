@@ -24,7 +24,7 @@
 #include "bus/ti99/colorbus/colorbus.h"
 #include "bus/ti99/internal/evpcconn.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 class snug_enhanced_video_device : public device_t, public device_ti99_peribox_card_interface, public device_nvram_interface
 {
@@ -49,22 +49,22 @@ protected:
 		//int dirty;
 	};
 
-	void device_start() override;
-	void device_reset() override;
+	void device_start() override ATTR_COLD;
+	void device_reset() override ATTR_COLD;
 	void device_stop() override;
 
-	virtual const tiny_rom_entry *device_rom_region() const override;
-	virtual ioport_constructor device_input_ports() const override;
-	virtual void device_add_mconfig(machine_config &config) override;
+	virtual const tiny_rom_entry *device_rom_region() const override ATTR_COLD;
+	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
 
-	void nvram_default() override;
-	void nvram_read(emu_file &file) override;
-	void nvram_write(emu_file &file) override;
+	virtual void nvram_default() override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
 
 private:
-	DECLARE_WRITE_LINE_MEMBER( ready_line );
+	void ready_line(int state);
 
-	DECLARE_WRITE_LINE_MEMBER( video_interrupt_in );
+	void video_interrupt_in(int state);
 
 	int     m_address;
 	int     m_dsr_page;
@@ -88,7 +88,7 @@ private:
 	optional_device<bus::ti99::internal::evpc_clock_connector>   m_console_conn;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_EVPC, bus::ti99::peb, snug_enhanced_video_device)
 

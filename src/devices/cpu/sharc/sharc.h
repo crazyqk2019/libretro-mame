@@ -52,10 +52,6 @@
 #define MODE2_CAFRZ         0x80000     /* Cache freeze */
 
 
-#define SIGN_EXTEND6(x)             (((x) & 0x20) ? (0xffffffc0 | (x)) : (x))
-#define SIGN_EXTEND24(x)            (((x) & 0x800000) ? (0xff000000 | (x)) : (x))
-#define MAKE_EXTRACT_MASK(start_bit, length)    ((0xffffffff << start_bit) & (((uint32_t)0xffffffff) >> (32 - (start_bit + length))))
-
 #define OP_USERFLAG_COUNTER_LOOP            0x00000001
 #define OP_USERFLAG_COND_LOOP               0x00000002
 #define OP_USERFLAG_COND_FIELD              0x000003fc
@@ -102,6 +98,8 @@ public:
 
 	TIMER_CALLBACK_MEMBER(sharc_iop_delayed_write_callback);
 	TIMER_CALLBACK_MEMBER(sharc_dma_callback);
+
+	void write_stall(int state);
 
 	void sharc_cfunc_unimplemented();
 	void sharc_cfunc_read_iop();
@@ -202,17 +200,16 @@ public:
 		EXCEPTION_COUNT
 	};
 
-	void internal_data(address_map &map);
-	void internal_pgm(address_map &map);
+	void internal_data(address_map &map) ATTR_COLD;
+	void internal_pgm(address_map &map) ATTR_COLD;
 protected:
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	// device_execute_interface overrides
 	virtual uint32_t execute_min_cycles() const noexcept override { return 8; }
 	virtual uint32_t execute_max_cycles() const noexcept override { return 8; }
-	virtual uint32_t execute_input_lines() const noexcept override { return 32; }
 	virtual void execute_run() override;
 	virtual void execute_set_input(int inputnum, int state) override;
 
@@ -270,6 +267,7 @@ private:
 		int32_t chained_direction;
 		emu_timer *timer;
 		bool active;
+		bool chained;
 	};
 
 
@@ -284,6 +282,7 @@ private:
 		opcode_func handler;
 	};
 	static const SHARC_OP s_sharc_opcode_table[];
+	static const size_t s_num_ops;
 
 	struct ASTAT_DRC
 	{
@@ -379,6 +378,7 @@ private:
 
 		SHARC_DMA_OP dma_op[12];
 		uint32_t dma_status;
+		bool write_stalled;
 
 		int32_t interrupt_active;
 
@@ -475,6 +475,7 @@ private:
 	void schedule_dma_op(int channel, uint32_t src, uint32_t dst, int src_modifier, int dst_modifier, int src_count, int dst_count, int pmode);
 	void dma_op(int channel);
 	void sharc_dma_exec(int channel);
+	void dma_run_cycle(int channel);
 	void add_systemreg_write_latency_effect(int sysreg, uint32_t data, uint32_t prev_data);
 	inline void swap_register(uint32_t *a, uint32_t *b);
 	void systemreg_write_latency_effect();

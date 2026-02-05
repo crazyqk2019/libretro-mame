@@ -19,10 +19,9 @@
 //#define VERBOSE 1
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(HPDIO_HUMAN_INTERFACE, bus::hp_dio, human_interface_device, "human_interface", "HP human interface card")
+DEFINE_DEVICE_TYPE(HPDIO_HUMAN_INTERFACE, bus::hp_dio::human_interface_device, "human_interface", "HP human interface card")
 
-namespace bus {
-	namespace hp_dio {
+namespace bus::hp_dio {
 
 void human_interface_device::device_add_mconfig(machine_config &config)
 {
@@ -108,7 +107,18 @@ human_interface_device::human_interface_device(const machine_config &mconfig, de
 	m_sound(*this, "sn76494"),
 	m_tms9914(*this, "tms9914"),
 	m_rtc(*this, "rtc"),
-	m_ieee488(*this, IEEE488_TAG)
+	m_ieee488(*this, IEEE488_TAG),
+	m_hil_read(false),
+	m_kbd_nmi(false),
+	m_gpib_irq_line(false),
+	m_gpib_dma_line(false),
+	m_old_latch_enable(false),
+	m_gpib_dma_enable(false),
+	m_hil_data(0),
+	m_latch_data(0),
+	m_rtc_data(0),
+	m_ppoll_sc(0),
+	m_ppoll_mask(0)
 {
 }
 
@@ -137,11 +147,17 @@ void human_interface_device::device_start()
 
 void human_interface_device::device_reset()
 {
-	m_ppoll_sc = 0;
-	m_gpib_irq_line = false;
+	m_hil_read = false;
 	m_kbd_nmi = false;
-	m_old_latch_enable = true;
+	m_gpib_irq_line = false;
+	m_gpib_dma_line = false;
 	m_gpib_dma_enable = false;
+	m_old_latch_enable = true;
+	m_ppoll_sc = 0;
+	m_hil_data = 0;
+	m_latch_data = 0;
+	m_rtc_data = 0;
+	m_ppoll_mask = 0;
 	m_rtc->cs1_w(ASSERT_LINE);
 	m_rtc->cs2_w(CLEAR_LINE);
 	m_rtc->write_w(CLEAR_LINE);
@@ -150,7 +166,7 @@ void human_interface_device::device_reset()
 	m_iocpu->reset();
 }
 
-WRITE_LINE_MEMBER(human_interface_device::reset_in)
+void human_interface_device::reset_in(int state)
 {
 	if (state)
 		device_reset();
@@ -162,7 +178,7 @@ void human_interface_device::update_gpib_irq()
 		((m_ppoll_sc & (PPOLL_IR|PPOLL_IE)) == (PPOLL_IR|PPOLL_IE))) ? ASSERT_LINE : CLEAR_LINE);
 }
 
-WRITE_LINE_MEMBER(human_interface_device::gpib_irq)
+void human_interface_device::gpib_irq(int state)
 {
 	m_gpib_irq_line = state;
 	update_gpib_irq();
@@ -173,7 +189,7 @@ void human_interface_device::update_gpib_dma()
 	dmar0_out(m_gpib_dma_enable && m_gpib_dma_line);
 }
 
-WRITE_LINE_MEMBER(human_interface_device::gpib_dreq)
+void human_interface_device::gpib_dreq(int state)
 {
 	m_gpib_dma_line = state;
 	update_gpib_dma();
@@ -322,7 +338,7 @@ uint8_t human_interface_device::iocpu_test0_r()
 	return !m_mlc->get_int();
 }
 
-WRITE_LINE_MEMBER(human_interface_device::rtc_d0_w)
+void human_interface_device::rtc_d0_w(int state)
 {
 	if (state)
 		m_rtc_data |= 1;
@@ -331,7 +347,7 @@ WRITE_LINE_MEMBER(human_interface_device::rtc_d0_w)
 
 }
 
-WRITE_LINE_MEMBER(human_interface_device::rtc_d1_w)
+void human_interface_device::rtc_d1_w(int state)
 {
 	if (state)
 		m_rtc_data |= 2;
@@ -339,7 +355,7 @@ WRITE_LINE_MEMBER(human_interface_device::rtc_d1_w)
 		m_rtc_data &= ~2;
 }
 
-WRITE_LINE_MEMBER(human_interface_device::rtc_d2_w)
+void human_interface_device::rtc_d2_w(int state)
 {
 	if (state)
 		m_rtc_data |= 4;
@@ -348,7 +364,7 @@ WRITE_LINE_MEMBER(human_interface_device::rtc_d2_w)
 
 }
 
-WRITE_LINE_MEMBER(human_interface_device::rtc_d3_w)
+void human_interface_device::rtc_d3_w(int state)
 {
 	if (state)
 		m_rtc_data |= 8;
@@ -372,4 +388,3 @@ uint8_t human_interface_device::dmack_r_in(int channel)
 }
 
 } // namespace bus::hp_dio
-} // namespace bus

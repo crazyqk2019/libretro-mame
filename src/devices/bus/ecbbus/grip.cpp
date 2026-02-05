@@ -179,35 +179,33 @@ MC6845_UPDATE_ROW( ecb_grip21_device::crtc_update_row )
 {
 	for (int column = 0; column < x_count; column++)
 	{
-		uint16_t address = (m_page << 12) | (((ma + column) & 0xfff) << 3) | (ra & 0x07);
-		uint8_t data = m_video_ram[address];
+		uint16_t const address = (m_page << 12) | (((ma + column) & 0xfff) << 3) | (ra & 0x07);
+		uint8_t const data = m_video_ram[address];
 
 		for (int bit = 0; bit < 8; bit++)
 		{
-			int x = (column * 8) + bit;
-			int color = (m_flash ? 0 : BIT(data, bit)) && de;
+			int const x = (column * 8) + bit;
+			int const color = (m_flash ? 0 : BIT(data, bit)) && de;
 
-			bitmap.pix32(vbp + y, hbp + x) = m_palette->pen(color);
+			bitmap.pix(vbp + y, hbp + x) = m_palette->pen(color);
 		}
 	}
 }
 /*
 MC6845_UPDATE_ROW( ecb_grip21_device::grip5_update_row )
 {
-    const rgb_t *palette = m_palette->palette()->entry_list_raw();
-    int column, bit;
-
-    for (column = 0; column < x_count; column++)
+    rgb_t const *const palette = m_palette->palette()->entry_list_raw();
+    for (int column = 0; column < x_count; column++)
     {
-        uint16_t address = (m_dpage << 12) | (((ma + column) & 0xfff) << 3) | (ra & 0x07);
-        uint8_t data = m_video_ram[address];
+        uint16_t const address = (m_dpage << 12) | (((ma + column) & 0xfff) << 3) | (ra & 0x07);
+        uint8_t const data = m_video_ram[address];
 
-        for (bit = 0; bit < 8; bit++)
+        for (int bit = 0; bit < 8; bit++)
         {
-            int x = (column * 8) + bit;
-            int color = m_flash ? 0 : BIT(data, bit);
+            int const x = (column * 8) + bit;
+            int const color = m_flash ? 0 : BIT(data, bit);
 
-            bitmap.pix32(y, x) = palette[color];
+            bitmap.pix(y, x) = palette[color];
         }
     }
 }
@@ -217,7 +215,7 @@ MC6845_ON_UPDATE_ADDR_CHANGED( ecb_grip21_device::grip5_addr_changed )
 }
 */
 
-static const int16_t speaker_levels[] = { -32768, 0, 32767, 0 };
+static const double speaker_levels[] = { -1.0, 0.0, 1.0, 0.0 };
 
 //-------------------------------------------------
 //  I8255A interface
@@ -319,7 +317,7 @@ void ecb_grip21_device::ppi_pc_w(uint8_t data)
 //  Z80STI_INTERFACE( sti_intf )
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER(ecb_grip21_device::write_centronics_busy)
+void ecb_grip21_device::write_centronics_busy(int state)
 {
 	m_centronics_busy = state;
 }
@@ -361,7 +359,7 @@ uint8_t ecb_grip21_device::sti_gpio_r()
 	return data;
 }
 
-WRITE_LINE_MEMBER( ecb_grip21_device::speaker_w )
+void ecb_grip21_device::speaker_w(int state)
 {
 	int level = state && ((m_vol1 << 1) | m_vol0);
 
@@ -569,11 +567,24 @@ ecb_grip21_device::ecb_grip21_device(const machine_config &mconfig, const char *
 	m_centronics(*this, CENTRONICS_TAG),
 	m_palette(*this, "palette"),
 	m_speaker(*this, "speaker"),
-	m_video_ram(*this, "video_ram"),
+	m_video_ram(*this, "video_ram", VIDEORAM_SIZE, ENDIANNESS_LITTLE),
 	m_j3a(*this, "J3A"),
 	m_j3b(*this, "J3B"),
 	m_j7(*this, "J7"),
-	m_centronics_busy(0), m_centronics_fault(0), m_vol0(0), m_vol1(0), m_ia(0), m_ib(0), m_keydata(0), m_kbf(0), m_lps(0), m_page(0), m_flash(0), m_base(0), m_ppi_pa(0), m_ppi_pc(0), m_kb_timer(nullptr)
+	m_centronics_busy(0),
+	m_centronics_fault(0),
+	m_vol0(0),
+	m_vol1(0),
+	m_ia(0),
+	m_ib(0),
+	m_keydata(0),
+	m_kbf(0),
+	m_lps(0),
+	m_page(0),
+	m_flash(0),
+	m_base(0),
+	m_ppi_pa(0),
+	m_ppi_pc(0)
 {
 }
 
@@ -583,16 +594,9 @@ ecb_grip21_device::ecb_grip21_device(const machine_config &mconfig, const char *
 
 void ecb_grip21_device::device_start()
 {
-	// allocate video RAM
-	m_video_ram.allocate(VIDEORAM_SIZE);
-
 	// setup GRIP memory banking
 	membank("videoram")->configure_entries(0, 2, m_video_ram, 0x8000);
 	membank("videoram")->set_entry(0);
-
-	// allocate keyboard scan timer
-	m_kb_timer = timer_alloc();
-	m_kb_timer->adjust(attotime::zero, 0, attotime::from_hz(2500));
 
 	// register for state saving
 	save_item(NAME(m_vol0));
@@ -676,7 +680,7 @@ void ecb_grip21_device::page_w(uint8_t data)
 //  stat_r -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER(ecb_grip21_device::write_centronics_fault)
+void ecb_grip21_device::write_centronics_fault(int state)
 {
 	m_centronics_fault = state;
 }

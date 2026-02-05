@@ -16,7 +16,7 @@
 #include "machine/i8255.h"
 #include "machine/i8251.h"
 #include "machine/pit8253.h"
-#include "sound/ym2151.h"
+#include "sound/ymopm.h"
 
 //**************************************************************************
 //  TYPE DEFINITIONS
@@ -36,7 +36,7 @@ protected:
 	virtual void                    device_start() override;
 	virtual void                    device_reset() override;
 
-	virtual void device_add_mconfig(machine_config &config) override;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
 	virtual ioport_constructor          device_input_ports() const override;
 
 	virtual const tiny_rom_entry*        device_rom_region() const override;
@@ -52,18 +52,18 @@ private:
 
 	void ppi1_o_c(uint8_t data);
 
-	DECLARE_WRITE_LINE_MEMBER( d8253_out0 );
-	DECLARE_WRITE_LINE_MEMBER( d8253_out1 );
+	void d8253_out0(int state);
+	void d8253_out1(int state);
 
-	DECLARE_WRITE_LINE_MEMBER( write_usart_clock );
+	void write_usart_clock(int state);
 
-	DECLARE_WRITE_LINE_MEMBER( ibm_mfc_ym_irq );
+	void ibm_mfc_ym_irq(int state);
 
 	uint8_t ibm_mfc_r(offs_t offset);
 	void ibm_mfc_w(offs_t offset, uint8_t data);
 
-	void io_map(address_map &map);
-	void prg_map(address_map &map);
+	void io_map(address_map &map) ATTR_COLD;
+	void prg_map(address_map &map) ATTR_COLD;
 
 	void                            set_z80_interrupt(int src, int state);
 	void                            set_pc_interrupt(int src, int state);
@@ -78,7 +78,7 @@ private:
 	uint8_t                           m_z80_irq_state;
 
 	required_device<cpu_device>     m_cpu;
-	required_device<ym2151_device>  m_ym2151;
+	required_device<ym2164_device>  m_ym2164;
 	required_device<pit8253_device> m_d8253;
 	required_device<i8251_device>   m_d71051;
 	required_device<i8255_device>   m_d71055c_0;

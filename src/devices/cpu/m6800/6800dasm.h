@@ -7,16 +7,6 @@
  *
  *   I'm afraid to put my name on it, but I feel obligated:
  *   This code written by Aaron Giles (agiles@sirius.com) for the MAME project
- *
- * History:
- * 990314 HJB
- * The disassembler knows about valid opcodes for M6800/1/2/3/8 and HD63701.
- * 990302 HJB
- * Changed the string array into a table of opcode names (or tokens) and
- * argument types. This second try should give somewhat better results.
- * Named the undocumented HD63701YO opcodes $12 and $13 'asx1' and 'asx2',
- * since 'add contents of stack to x register' is what they do.
- *
  */
 
 #ifndef MAME_CPU_M6800_6800DASM_H
@@ -68,7 +58,7 @@ private:
 	};
 
 	static const char *const op_name_str[];
-	static const uint8_t table[0x104][3];
+	static const u8 table[0x104][3];
 
 	int m_subtype;
 };

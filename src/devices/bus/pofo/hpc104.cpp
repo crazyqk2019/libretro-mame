@@ -100,8 +100,8 @@ pofo_hpc104_device::pofo_hpc104_device(const machine_config &mconfig, device_typ
 	device_portfolio_expansion_slot_interface(mconfig, *this),
 	device_nvram_interface(mconfig, *this),
 	m_ccm(*this, PORTFOLIO_MEMORY_CARD_SLOT_B_TAG),
-	m_exp(*this, PORTFOLIO_EXPANSION_SLOT_TAG),
-	m_nvram(*this, "nvram"),
+	m_exp(*this, "exp"),
+	m_nvram(*this, "nvram", 0x40000, ENDIANNESS_LITTLE),
 	m_io_sw1(*this, "SW1")
 {
 }
@@ -128,8 +128,6 @@ pofo_hpc104_2_device::pofo_hpc104_2_device(const machine_config &mconfig, const 
 
 void pofo_hpc104_device::device_start()
 {
-	// allocate memory
-	m_nvram.allocate(0x40000);
 }
 
 
@@ -140,6 +138,25 @@ void pofo_hpc104_device::device_start()
 void pofo_hpc104_device::device_reset()
 {
 	m_sw1 = BIT(m_io_sw1->read(), 0);
+}
+
+
+void pofo_hpc104_device::nvram_default()
+{
+}
+
+
+bool pofo_hpc104_device::nvram_read(util::read_stream &file)
+{
+	auto const [err, actual] = read(file, m_nvram, 0x40000);
+	return !err && (actual == 0x40000);
+}
+
+
+bool pofo_hpc104_device::nvram_write(util::write_stream &file)
+{
+	auto const [err, actual] = write(file, m_nvram, 0x40000);
+	return !err;
 }
 
 
@@ -171,7 +188,7 @@ uint8_t pofo_hpc104_device::nrdi_r(offs_t offset, uint8_t data, bool iom, bool b
 		{
 			if (offset >= 0x1f000 && offset < 0x5f000)
 			{
-				data = m_nvram[offset - 0x1f000] = data;
+				data = m_nvram[offset - 0x1f000];
 			}
 		}
 	}

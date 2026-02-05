@@ -35,9 +35,38 @@
 #include "byte8251.h"
 
 #include "bus/rs232/rs232.h"
+#include "machine/i8251.h"
+#include "machine/mm5307.h"
 
-// device type definition
-DEFINE_DEVICE_TYPE(A2BUS_BYTE8251, a2bus_byte8251_device, "a2bus_byte8251", "BYTE Serial Interface (8251 based)")
+
+namespace {
+
+class a2bus_byte8251_device : public device_t, public device_a2bus_card_interface
+{
+public:
+	// construction/destruction
+	a2bus_byte8251_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
+
+	DECLARE_INPUT_CHANGED_MEMBER(rate_changed);
+
+protected:
+	// device_t implementation
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
+	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
+
+	// device_a2bus_card_interface implementation
+	virtual u8 read_c0nx(u8 offset) override;
+	virtual void write_c0nx(u8 offset, u8 data) override;
+	virtual void reset_from_bus() override;
+
+private:
+	// object finders
+	required_device<i8251_device> m_usart;
+	required_device<mm5307_device> m_brg;
+	required_ioport m_switches;
+};
 
 a2bus_byte8251_device::a2bus_byte8251_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
 	: device_t(mconfig, A2BUS_BYTE8251, tag, owner, clock)
@@ -60,6 +89,12 @@ void a2bus_byte8251_device::device_reset()
 	m_brg->control_w(m_switches->read());
 }
 
+void a2bus_byte8251_device::reset_from_bus()
+{
+	m_usart->reset();
+	m_brg->reset();
+}
+
 INPUT_CHANGED_MEMBER(a2bus_byte8251_device::rate_changed)
 {
 	m_brg->control_w(newval);
@@ -77,7 +112,7 @@ void a2bus_byte8251_device::write_c0nx(u8 offset, u8 data)
 
 static INPUT_PORTS_START(byte8251)
 	PORT_START("SWITCHES") // “A dual in line pin-type switch may be used”
-	PORT_DIPNAME(0xf, 0xf, "Data Rate") PORT_DIPLOCATION("S:1,2,3,4") PORT_CHANGED_MEMBER(DEVICE_SELF, a2bus_byte8251_device, rate_changed, 0)
+	PORT_DIPNAME(0xf, 0xf, "Data Rate") PORT_DIPLOCATION("S:1,2,3,4") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(a2bus_byte8251_device::rate_changed), 0)
 	PORT_DIPSETTING(0x1, "50 bps")
 	PORT_DIPSETTING(0x2, "75 bps")
 	PORT_DIPSETTING(0x3, "110 bps")
@@ -105,10 +140,16 @@ void a2bus_byte8251_device::device_add_mconfig(machine_config &config)
 	I8251(config, m_usart, 1021800); // CLK tied to ϕ1 signal from bus pin 38
 	m_usart->txd_handler().set("rs232", FUNC(rs232_port_device::write_txd));
 
-	MM5307AA(config, m_brg, A2BUS_7M_CLOCK / 8);
+	MM5307AA(config, m_brg, DERIVED_CLOCK(1, 8));
 	m_brg->output_cb().set(m_usart, FUNC(i8251_device::write_txc));
 	m_brg->output_cb().append(m_usart, FUNC(i8251_device::write_rxc));
 
 	rs232_port_device &rs232(RS232_PORT(config, "rs232", default_rs232_devices, nullptr));
 	rs232.rxd_handler().set(m_usart, FUNC(i8251_device::write_rxd));
 }
+
+} // anonymous namespace
+
+
+// device type definition
+DEFINE_DEVICE_TYPE_PRIVATE(A2BUS_BYTE8251, device_a2bus_card_interface, a2bus_byte8251_device, "a2bus_byte8251", "BYTE Serial Interface (8251 based)")

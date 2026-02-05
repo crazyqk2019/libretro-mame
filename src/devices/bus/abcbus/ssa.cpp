@@ -121,7 +121,7 @@ abc_super_smartaid_device::abc_super_smartaid_device(const machine_config &mconf
 	m_rom_1(*this, "ssa1"),
 	m_rom_2(*this, "ssa2"),
 	m_prom(*this, "ssa3"),
-	m_nvram(*this, "nvram"),
+	m_nvram(*this, "nvram", 0x800, ENDIANNESS_LITTLE),
 	m_rom_bank(0),
 	m_prom_bank(0)
 {
@@ -144,9 +144,6 @@ void abc_super_smartaid_device::device_start()
 		m_rom_2->base()[i] = bitswap<8>(m_rom_2->base()[i], 2, 6, 1, 4, 3, 5, 7, 0);
 	}
 
-	// allocate memory
-	m_nvram.allocate(0x800);
-
 	// state saving
 	save_item(NAME(m_rom_bank));
 	save_item(NAME(m_prom_bank));
@@ -161,6 +158,23 @@ void abc_super_smartaid_device::device_reset()
 {
 	m_rom_bank = 0;
 	m_prom_bank = 0;
+}
+
+
+void abc_super_smartaid_device::nvram_default()
+{
+}
+
+bool abc_super_smartaid_device::nvram_read(util::read_stream &file)
+{
+	auto const [err, actual] = read(file, m_nvram, m_nvram.bytes());
+	return !err && (actual == m_nvram.bytes());
+}
+
+bool abc_super_smartaid_device::nvram_write(util::write_stream &file)
+{
+	auto const [err, actual] = write(file, m_nvram, m_nvram.bytes());
+	return !err;
 }
 
 
@@ -181,7 +195,7 @@ uint8_t abc_super_smartaid_device::abcbus_xmemfl(offs_t offset)
 	{
 	case 0x08:
 		m_prom_bank = 1;
-		// fallthru
+		[[fallthrough]];
 	case 0x0c: case 0x0f:
 		data = m_rom_2->base()[(m_rom_bank << 12) | (offset & 0xfff)];
 		break;

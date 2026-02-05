@@ -22,8 +22,13 @@ public:
 
 	auto irq_callback() { return m_irq_callback.bind(); }
 	auto dma_end() { return m_dma_end.bind(); }
-	template <int Ch> auto dma_read() { return m_dma_read[Ch].bind(); }
-	template <int Ch> auto dma_write() { return m_dma_write[Ch].bind(); }
+	auto own() { return m_own.bind(); }
+	template <int Ch> auto dma8_read() { return m_dma8_read[Ch].bind(); }
+	template <int Ch> auto dma8_write() { return m_dma8_write[Ch].bind(); }
+	template <int Ch> auto dma16_read() { return m_dma16_read[Ch].bind(); }
+	template <int Ch> auto dma16_write() { return m_dma16_write[Ch].bind(); }
+	template <int Ch> auto dma32_read() { return m_dma32_read[Ch].bind(); }
+	template <int Ch> auto dma32_write() { return m_dma32_write[Ch].bind(); }
 
 	template <typename T> void set_cpu_tag(T &&cpu_tag) { m_cpu.set_tag(std::forward<T>(cpu_tag)); }
 	void set_clocks(const attotime &clk1, const attotime &clk2, const attotime &clk3, const attotime &clk4)
@@ -43,19 +48,34 @@ public:
 
 	uint16_t read(offs_t offset);
 	void write(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
-	DECLARE_WRITE_LINE_MEMBER(drq0_w);
-	DECLARE_WRITE_LINE_MEMBER(drq1_w);
-	DECLARE_WRITE_LINE_MEMBER(drq2_w);
-	DECLARE_WRITE_LINE_MEMBER(drq3_w);
+	void drq0_w(int state) { drq_w(0, state); }
+	void drq1_w(int state) { drq_w(1, state); }
+	void drq2_w(int state) { drq_w(2, state); }
+	void drq3_w(int state) { drq_w(3, state); }
+	void pcl0_w(int state) { pcl_w(0, state); }
+	void pcl1_w(int state) { pcl_w(1, state); }
+	void pcl2_w(int state) { pcl_w(2, state); }
+	void pcl3_w(int state) { pcl_w(3, state); }
 	uint8_t iack();
+
+	enum {
+		ERR_RESET = 0,
+		ERR_FREE_BUS_RETRY = 3,
+		ERR_RETRY = 4,
+		ERR_BUS = 5,
+		ERR_HALT = 6,
+		ERR_NONE= 7
+	};
+	void bec_w(offs_t offset, uint8_t data) { m_bec = data; }
+	void dtack_w(int state) { m_dtack = !state; }
 
 	void single_transfer(int x);
 	void set_timer(int channel, const attotime &tm);
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 private:
 	struct hd63450_regs
@@ -82,21 +102,29 @@ private:
 
 	devcb_write_line m_irq_callback;
 	devcb_write8 m_dma_end;
-	devcb_read8::array<4> m_dma_read;
-	devcb_write8::array<4> m_dma_write;
+	devcb_write_line m_own;
+	devcb_read8::array<4> m_dma8_read;
+	devcb_write8::array<4> m_dma8_write;
+	devcb_read16::array<4> m_dma16_read;
+	devcb_write16::array<4> m_dma16_write;
+	devcb_read32::array<4> m_dma32_read;
+	devcb_write32::array<4> m_dma32_write;
 
 	attotime m_our_clock[4];
 	attotime m_burst_clock[4];
 
 	// internal state
 	hd63450_regs m_reg[4];
+	uint32_t m_packed_value[4], m_packed_index[4];
 	emu_timer* m_timer[4];  // for timing data reading/writing each channel
 	uint16_t m_transfer_size[4];
 	bool m_halted[4];  // non-zero if a channel has been halted, and can be continued later.
 	required_device<cpu_device> m_cpu;
 	bool m_drq_state[4];
-
 	int8_t m_irq_channel;
+	uint8_t m_bec;
+
+	bool m_dtack;
 
 	// tell if a channel is in use
 	bool dma_in_progress(int channel) const { return (m_reg[channel].csr & 0x08) != 0; }
@@ -111,6 +139,9 @@ private:
 	// interrupt helpers
 	void set_irq(int channel);
 	void clear_irq(int channel);
+
+	void drq_w(int channel, int state);
+	void pcl_w(int channel, int state);
 };
 
 DECLARE_DEVICE_TYPE(HD63450, hd63450_device)

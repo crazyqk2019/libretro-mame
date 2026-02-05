@@ -9,7 +9,11 @@
 ***************************************************************************/
 
 #include "emu.h"
+
+#include "fileio.h"
+#include "main.h"
 #include "screen.h"
+
 #include "aviio.h"
 #include "png.h"
 
@@ -142,7 +146,10 @@ movie_recording::ptr movie_recording::create(running_machine &machine, screen_de
 
 	// if we successfully create a recording, set the current time and return it
 	if (result)
+	{
 		result->set_next_frame_time(machine.time());
+		result->set_channel_count(machine.sound().outputs_count());
+	}
 	return result;
 }
 
@@ -175,8 +182,8 @@ bool avi_movie_recording::initialize(running_machine &machine, std::unique_ptr<e
 	// build up information about this new movie
 	avi_file::movie_info info;
 	info.video_format = 0;
-	info.video_timescale = 1000 * (screen() ? screen()->frame_period().as_hz() : screen_device::DEFAULT_FRAME_RATE);
-	info.video_sampletime = 1000;
+	info.video_timescale = 0x3fff'fffc; // multiple of 60, for screenless machines
+	info.video_sampletime = screen() ? screen()->frame_period().as_ticks(info.video_timescale) : 0x0111'1111;
 	info.video_numsamples = 0;
 	info.video_width = width;
 	info.video_height = height;
@@ -186,12 +193,14 @@ bool avi_movie_recording::initialize(running_machine &machine, std::unique_ptr<e
 	info.audio_timescale = machine.sample_rate();
 	info.audio_sampletime = 1;
 	info.audio_numsamples = 0;
-	info.audio_channels = 2;
+	info.audio_channels = machine.sound().outputs_count();
 	info.audio_samplebits = 16;
 	info.audio_samplerate = machine.sample_rate();
 
+	m_channels = info.audio_channels;
+
 	// compute the frame time
-	set_frame_period(attotime::from_seconds(1000) / info.video_timescale);
+	set_frame_period(attotime::from_ticks(info.video_sampletime, info.video_timescale));
 
 	// create the file
 	avi_file::error avierr = avi_file::create(fullpath, info, m_avi_file);
@@ -218,14 +227,13 @@ bool avi_movie_recording::append_single_video_frame(bitmap_rgb32 &bitmap, const 
 
 bool avi_movie_recording::add_sound_to_recording(const s16 *sound, int numsamples)
 {
-	g_profiler.start(PROFILER_MOVIE_REC);
+	auto profile = g_profiler.start(PROFILER_MOVIE_REC);
 
 	// write the next frame
-	avi_file::error avierr = m_avi_file->append_sound_samples(0, sound + 0, numsamples, 1);
-	if (avierr == avi_file::error::NONE)
-		avierr = m_avi_file->append_sound_samples(1, sound + 1, numsamples, 1);
+	avi_file::error avierr = avi_file::error::NONE;
+	for (int channel = 0; channel != m_channels && avierr == avi_file::error::NONE; channel ++)
+		avierr = m_avi_file->append_sound_samples(channel, sound + channel, numsamples, m_channels-1);
 
-	g_profiler.stop();
 	return avierr == avi_file::error::NONE;
 }
 
@@ -248,7 +256,7 @@ mng_movie_recording::mng_movie_recording(screen_device *screen, std::map<std::st
 mng_movie_recording::~mng_movie_recording()
 {
 	if (m_mng_file)
-		mng_capture_stop(*m_mng_file);
+		util::mng_capture_stop(*m_mng_file);
 }
 
 
@@ -264,10 +272,10 @@ bool mng_movie_recording::initialize(std::unique_ptr<emu_file> &&file, bitmap_t 
 	set_frame_period(attotime::from_hz(rate));
 
 	m_mng_file = std::move(file);
-	png_error pngerr = mng_capture_start(*m_mng_file, snap_bitmap, rate);
-	if (pngerr != PNGERR_NONE)
-		osd_printf_error("Error capturing MNG, png_error=%d\n", pngerr);
-	return pngerr == PNGERR_NONE;
+	std::error_condition const pngerr = util::mng_capture_start(*m_mng_file, snap_bitmap, rate);
+	if (pngerr)
+		osd_printf_error("Error capturing MNG (%s:%d %s)\n", pngerr.category().name(), pngerr.value(), pngerr.message());
+	return !pngerr;
 }
 
 
@@ -278,15 +286,15 @@ bool mng_movie_recording::initialize(std::unique_ptr<emu_file> &&file, bitmap_t 
 bool mng_movie_recording::append_single_video_frame(bitmap_rgb32 &bitmap, const rgb_t *palette, int palette_entries)
 {
 	// set up the text fields in the movie info
-	png_info pnginfo;
+	util::png_info pnginfo;
 	if (current_frame() == 0)
 	{
 		for (auto &ent : m_info_fields)
-			pnginfo.add_text(ent.first.c_str(), ent.second.c_str());
+			pnginfo.add_text(ent.first, ent.second);
 	}
 
-	png_error error = mng_capture_frame(*m_mng_file, pnginfo, bitmap, palette_entries, palette);
-	return error == png_error::PNGERR_NONE;
+	std::error_condition const error = util::mng_capture_frame(*m_mng_file, pnginfo, bitmap, palette_entries, palette);
+	return !error;
 }
 
 

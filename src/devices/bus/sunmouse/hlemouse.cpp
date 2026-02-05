@@ -3,7 +3,6 @@
 #include "emu.h"
 #include "hlemouse.h"
 
-#define LOG_GENERAL (1U << 0)
 #define LOG_BIT     (1U << 1)
 
 //#define VERBOSE (LOG_GENERAL | LOG_BIT)
@@ -27,33 +26,33 @@
     DEVICE TYPE GLOBALS
 ***************************************************************************/
 
-DEFINE_DEVICE_TYPE_NS(SUN_1200BAUD_HLE_MOUSE, bus::sunmouse, hle_1200baud_device, "sunmouse_hle1200", "Sun Mouse (1200 Baud, HLE)")
-DEFINE_DEVICE_TYPE_NS(SUN_4800BAUD_HLE_MOUSE, bus::sunmouse, hle_4800baud_device, "sunmouse_hle4800", "Sun Mouse (4800 Baud, HLE)")
+DEFINE_DEVICE_TYPE(SUN_1200BAUD_HLE_MOUSE, bus::sunmouse::hle_1200baud_device, "sunmouse_hle1200", "Sun Mouse (1200 Baud, HLE)")
+DEFINE_DEVICE_TYPE(SUN_4800BAUD_HLE_MOUSE, bus::sunmouse::hle_4800baud_device, "sunmouse_hle4800", "Sun Mouse (4800 Baud, HLE)")
 
-namespace bus { namespace sunmouse {
+namespace bus::sunmouse {
 
 namespace {
 
 INPUT_PORTS_START( mouse )
 	PORT_START("BTN")
 	PORT_BIT( 0xfff8, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_CODE(MOUSECODE_BUTTON1) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_device_base, input_changed, 0)
-	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON3) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_device_base, input_changed, 0)
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_device_base, input_changed, 0)
+	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_CODE(MOUSECODE_BUTTON1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_device_base::input_changed), 0)
+	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON3) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_device_base::input_changed), 0)
+	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_device_base::input_changed), 0)
 
 	PORT_START("X")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_X ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_X ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_device_base::input_changed), 0)
 
 	PORT_START("Y")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_Y ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_Y ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_device_base::input_changed), 0)
 INPUT_PORTS_END
 
 
 uint8_t extract_delta_byte(int32_t &delta)
 {
-	int32_t const result(std::min<int32_t>(std::max<int32_t>(delta, -120), 127));
+	int32_t const result(std::clamp<int32_t>(delta, -120, 127));
 	delta -= result;
 	return uint8_t(int8_t(result));
 }
@@ -229,6 +228,7 @@ void hle_device_base::tra_complete()
 					m_y_delta);
 			//break; uncommenting this causes problems with early versions of Solaris
 		}
+		[[fallthrough]];
 	case 1U:
 		LOG("Sent %s (B=%X->%x X=%d Y=%d) - sending X delta\n",
 				(1U == m_phase) ? "button state" : "Y delta",
@@ -311,4 +311,4 @@ hle_4800baud_device::hle_4800baud_device(
 {
 }
 
-} } // namespace bus::sunmouse
+} // namespace bus::sunmouse

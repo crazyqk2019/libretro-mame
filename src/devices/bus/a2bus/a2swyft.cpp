@@ -4,7 +4,8 @@
 
     a2swyft.c
 
-    Implementation of the IAI SwyftCard
+    Implementation of the IAI SwyftCard. This card was designed to
+    occupy slot 3 of an enhanced Apple IIe.
 
 *********************************************************************/
 
@@ -12,15 +13,11 @@
 #include "a2swyft.h"
 
 
+namespace {
+
 /***************************************************************************
     PARAMETERS
 ***************************************************************************/
-
-//**************************************************************************
-//  GLOBAL VARIABLES
-//**************************************************************************
-
-DEFINE_DEVICE_TYPE(A2BUS_SWYFT, a2bus_swyft_device, "a2swyft", "IAI SwyftCard")
 
 #define SWYFT_ROM_REGION  "swyft_rom"
 
@@ -30,6 +27,40 @@ ROM_START( swyft )
 	ROM_REGION(0x1000, "pal16r4", 0)
 	ROM_LOAD( "swyft_pal16r4.jed", 0x0000, 0x08EF, CRC(462a6938) SHA1(38be885539cf91423a246378c411ac8b2f150ec6) ) // swyft3.pal derived by D. Elvey, works as a replacement pal (original is protected?)
 ROM_END
+
+//**************************************************************************
+//  TYPE DEFINITIONS
+//**************************************************************************
+
+class a2bus_swyft_device:
+	public device_t,
+	public device_a2bus_card_interface
+{
+public:
+	// construction/destruction
+	a2bus_swyft_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+
+	virtual const tiny_rom_entry *device_rom_region() const override ATTR_COLD;
+
+protected:
+	a2bus_swyft_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
+
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
+
+	virtual uint8_t read_c0nx(uint8_t offset) override;
+	virtual void write_c0nx(uint8_t offset, uint8_t data) override;
+	virtual uint8_t read_inh_rom(uint16_t offset) override;
+	virtual uint16_t inh_start() override { return 0xd000; }
+	virtual uint16_t inh_end() override { return 0xffff; }
+	virtual int inh_type() override;
+	virtual void reset_from_bus() override;
+
+private:
+	required_region_ptr<uint8_t> m_rom;
+	int m_rombank = 0;
+	int m_inh_state = 0;
+};
 
 //-------------------------------------------------
 //  rom_region - device-specific ROM region
@@ -51,7 +82,8 @@ a2bus_swyft_device::a2bus_swyft_device(const machine_config &mconfig, const char
 
 a2bus_swyft_device::a2bus_swyft_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock) :
 		device_t(mconfig, type, tag, owner, clock),
-		device_a2bus_card_interface(mconfig, *this), m_rom(nullptr), m_rombank(0), m_inh_state(0)
+		device_a2bus_card_interface(mconfig, *this),
+		m_rom(*this, SWYFT_ROM_REGION)
 {
 }
 
@@ -61,12 +93,16 @@ a2bus_swyft_device::a2bus_swyft_device(const machine_config &mconfig, device_typ
 
 void a2bus_swyft_device::device_start()
 {
-	m_rom = device().machine().root_device().memregion(this->subtag(SWYFT_ROM_REGION).c_str())->base();
-
 	save_item(NAME(m_rombank));
 }
 
 void a2bus_swyft_device::device_reset()
+{
+	// TODO: card uses both /RES and a dedicated power-on reset circuit
+	reset_from_bus();
+}
+
+void a2bus_swyft_device::reset_from_bus()
 {
 	m_rombank = 0;
 
@@ -142,3 +178,12 @@ int a2bus_swyft_device::inh_type()
 {
 	return m_inh_state;
 }
+
+} // anonymous namespace
+
+
+//**************************************************************************
+//  GLOBAL VARIABLES
+//**************************************************************************
+
+DEFINE_DEVICE_TYPE_PRIVATE(A2BUS_SWYFT, device_a2bus_card_interface, a2bus_swyft_device, "a2swyft", "IAI SwyftCard")

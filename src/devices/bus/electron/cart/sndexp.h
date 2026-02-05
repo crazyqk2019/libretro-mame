@@ -26,11 +26,11 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 	// optional information overrides
-	virtual void device_add_mconfig(machine_config &config) override;
-	virtual ioport_constructor device_input_ports() const override;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
+	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
 
 	// electron_cart_interface overrides
 	virtual uint8_t read(offs_t offset, int infc, int infd, int romqa, int oe, int oe2) override;
@@ -38,7 +38,7 @@ protected:
 
 private:
 	required_device<sn76489_device> m_sn;
-	required_ioport m_jumper;
+	required_ioport m_link;
 
 	uint8_t m_sound_latch;
 	uint8_t m_sound_enable;

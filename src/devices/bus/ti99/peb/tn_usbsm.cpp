@@ -42,15 +42,15 @@
 #include "emu.h"
 #include "tn_usbsm.h"
 
-#define LOG_WARN        (1U<<1)    // Warnings
+#define LOG_WARN        (1U << 1)    // Warnings
 
-#define VERBOSE ( LOG_WARN )
+#define VERBOSE (LOG_WARN)
 #include "logmacro.h"
 
 
-DEFINE_DEVICE_TYPE_NS(TI99_USBSM, bus::ti99::peb, nouspikel_usb_smartmedia_device, "ti99_usbsm", "Nouspikel USB/Smartmedia card")
+DEFINE_DEVICE_TYPE(TI99_USBSM, bus::ti99::peb::nouspikel_usb_smartmedia_device, "ti99_usbsm", "Nouspikel USB/Smartmedia card")
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 #define STRATA_TAG "strata"
 
@@ -367,4 +367,5 @@ ioport_constructor nouspikel_usb_smartmedia_device::device_input_ports() const
 {
 	return INPUT_PORTS_NAME(tn_usbsm);
 }
-} } } // end namespace bus::ti99::peb
+
+} // end namespace bus::ti99::peb

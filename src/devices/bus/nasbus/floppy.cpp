@@ -24,9 +24,11 @@
 
 DEFINE_DEVICE_TYPE(NASCOM_FDC, nascom_fdc_device, "nascom_fdc", "Nascom Floppy Disc Controller")
 
-FLOPPY_FORMATS_MEMBER( nascom_fdc_device::floppy_formats )
-	FLOPPY_NASCOM_FORMAT
-FLOPPY_FORMATS_END
+void nascom_fdc_device::floppy_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_NASCOM_FORMAT);
+}
 
 static void nascom_floppies(device_slot_interface &device)
 {
@@ -78,7 +80,7 @@ nascom_fdc_device::nascom_fdc_device(const machine_config &mconfig, const char *
 void nascom_fdc_device::device_start()
 {
 	// timer to turn off the drive motor line
-	m_motor = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(nascom_fdc_device::motor_off), this));
+	m_motor = timer_alloc(FUNC(nascom_fdc_device::motor_off), this);
 
 	save_item(NAME(m_select));
 }

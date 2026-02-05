@@ -30,8 +30,8 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	// device_wangpcbus_card_interface overrides
 	virtual uint16_t wangpcbus_mrdc_r(offs_t offset, uint16_t mem_mask) override;
@@ -40,7 +40,7 @@ protected:
 	virtual void wangpcbus_aiowc_w(offs_t offset, uint16_t mem_mask, uint16_t data) override;
 
 private:
-	optional_shared_ptr<uint16_t> m_ram;
+	memory_share_creator<uint16_t> m_ram;
 	uint16_t m_option;
 	int m_parity_error;
 	int m_parity_odd;

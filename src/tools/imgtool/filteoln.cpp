@@ -8,11 +8,12 @@
 
 *****************************************************************************/
 
+#include "imgtool.h"
+#include "filter.h"
+
 #include <cstring>
 
-#include "imgtool.h"
-
-#define EOLN (CRLF == 1 ? "\r" : (CRLF == 2 ? "\n" : (CRLF == 3 ? "\r\n" : NULL)))
+#define EOLN (CRLF == 1 ? "\r" : (CRLF == 2 ? "\n" : (CRLF == 3 ? "\r\n" : nullptr)))
 
 
 
@@ -95,7 +96,7 @@ static imgtoolerr_t ascii_writefile(imgtool::partition &partition, const char *f
 
 
 
-void filter_eoln_getinfo(uint32_t state, union filterinfo *info)
+void filter_eoln_getinfo(uint32_t state, imgtool::filterinfo *info)
 {
 	switch(state)
 	{

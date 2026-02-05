@@ -8,19 +8,106 @@
 #ifndef INPUT_RETRO_H_
 #define INPUT_RETRO_H_
 
+#include "osdretro.h"
 
+enum
+{
+	SWITCH_B,           // button bits
+	SWITCH_A,
+	SWITCH_Y,
+	SWITCH_X,
+	SWITCH_L1,
+	SWITCH_R1,
+	SWITCH_L3,
+	SWITCH_R3,
+	SWITCH_START,
+	SWITCH_SELECT,
+
+	SWITCH_DPAD_UP,     // D-pad bits
+	SWITCH_DPAD_DOWN,
+	SWITCH_DPAD_LEFT,
+	SWITCH_DPAD_RIGHT,
+
+	SWITCH_L2,          // for arcade stick/pad with LT/RT buttons
+	SWITCH_R2,
+
+	SWITCH_TOTAL
+};
+
+enum
+{
+	AXIS_L2,            // half-axes for triggers
+	AXIS_R2,
+
+	AXIS_LX,            // full-precision axes
+	AXIS_LY,
+	AXIS_RX,
+	AXIS_RY,
+
+	AXIS_TOTAL
+};
+
+enum
+{
+	MOUSE_LEFT,
+	MOUSE_RIGHT,
+	MOUSE_MIDDLE,
+	MOUSE_4,
+	MOUSE_5,
+	MOUSE_WHEEL_UP,
+	MOUSE_WHEEL_DOWN,
+	MOUSE_WHEEL_LEFT,
+	MOUSE_WHEEL_RIGHT,
+
+	MOUSE_BUTTONS_TOTAL
+};
+
+enum
+{
+	LIGHTGUN_TRIGGER,
+	LIGHTGUN_AUX_A,
+	LIGHTGUN_AUX_B,
+	LIGHTGUN_AUX_C,
+	LIGHTGUN_START,
+	LIGHTGUN_SELECT,
+	LIGHTGUN_DPAD_UP,
+	LIGHTGUN_DPAD_DOWN,
+	LIGHTGUN_DPAD_LEFT,
+	LIGHTGUN_DPAD_RIGHT,
+
+	LIGHTGUN_BUTTONS_TOTAL
+};
+
+#define RETRO_MAX_PLAYERS 8
+#define RETRO_MAX_JOYSTICK_BUTTONS SWITCH_TOTAL
+#define RETRO_MAX_MOUSE_BUTTONS MOUSE_BUTTONS_TOTAL
+#define RETRO_MAX_LIGHTGUN_BUTTONS LIGHTGUN_BUTTONS_TOTAL
 
 //============================================================
 //  TYPEDEFS
 //============================================================
 
-typedef struct joystate_t
+typedef struct joystickstate_t
 {
-   int button[RETRO_MAX_BUTTONS];
-   int a1[2];
-   int a2[2];
-   int a3[2];
-}Joystate;
+	int button[RETRO_MAX_JOYSTICK_BUTTONS];
+	int a1[2];
+	int a2[2];
+	int a3[2];
+} joystickstate_t;
+
+typedef struct mousestate_t
+{
+	int x;
+	int y;
+	int button[RETRO_MAX_MOUSE_BUTTONS];
+} mousestate_t;
+
+typedef struct lightgunstate_t
+{
+	int x;
+	int y;
+	int button[RETRO_MAX_LIGHTGUN_BUTTONS];
+} lightgunstate_t;
 
 struct KeyPressEventArgs
 {
@@ -29,54 +116,29 @@ struct KeyPressEventArgs
 	uint8_t scancode;
 };
 
-struct kt_table
+struct keyboard_table_t
 {
-   const char  *   mame_key_name;
-   int retro_key_name;
-   input_item_id   mame_key;
+	const char *mame_key_name;
+	int retro_key_name;
+	input_item_id mame_key;
 };
 
-extern uint16_t retrokbd_state[RETROK_LAST];
-extern uint16_t retrokbd_state2[RETROK_LAST];
-extern kt_table ktable[];
+extern void retro_keyboard_event(bool, unsigned, uint32_t, uint16_t);
 
-extern int mouseLX;
-extern int mouseLY;
-extern int mouseBUT[4];
-
-extern int lightgunX;
-extern int lightgunY;
-extern int lightgunBUT[4];
-
-extern Joystate joystate[4];
-
-extern int fb_width;
-extern int fb_height;
-
-class retroinput_module : public input_module_base
+template <typename Info>
+class retro_input_module : public input_module_impl<Info, retro_osd_interface>
 {
 protected:
 	bool  m_global_inputs_enabled;
 
 public:
-	retroinput_module(const char * type, const char * name)
-		: input_module_base(type, name),
-			m_global_inputs_enabled(false)
+	retro_input_module(const char *type, const char *name)
+		: input_module_impl<Info, retro_osd_interface>(type, name),
+			m_global_inputs_enabled(true)
 	{
 	}
 
-	virtual bool should_hide_mouse()
-	{
-		if (/*winwindow_has_focus()  // has focus
-			&& (!video_config.windowed || !osd_common_t::s_window_list.front()->win_has_menu()) // not windowed or doesn't have a menu
-			&&*/ (input_enabled() && !input_paused()) // input enabled and not paused
-			&& (mouse_enabled() || lightgun_enabled())) // either mouse or lightgun enabled in the core
-		{
-			return true;
-		}
-
-		return false;
-	}
+	bool input_enabled() const { return m_global_inputs_enabled; }
 
 	virtual bool handle_input_event(void)
 	{
@@ -84,18 +146,6 @@ public:
 	}
 
 protected:
-
-	void before_poll(running_machine& machine) override
-	{
-		// periodically process events, in case they're not coming through
-		// this also will make sure the mouse state is up-to-date
-		//winwindow_process_events_periodic(machine);
-	}
-
-	bool should_poll_devices(running_machine &machine) override
-	{
-		return input_enabled() && (m_global_inputs_enabled /*|| winwindow_has_focus()*/);
-	}
 };
 
 #endif

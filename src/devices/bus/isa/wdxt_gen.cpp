@@ -100,17 +100,17 @@ void wdxt_gen_device::wd1015_io(address_map &map)
 //  WD11C00_17_INTERFACE( host_intf )
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( wdxt_gen_device::irq5_w )
+void wdxt_gen_device::irq5_w(int state)
 {
 	m_isa->irq5_w(state);
 }
 
-WRITE_LINE_MEMBER( wdxt_gen_device::drq3_w )
+void wdxt_gen_device::drq3_w(int state)
 {
 	m_isa->drq3_w(state);
 }
 
-WRITE_LINE_MEMBER( wdxt_gen_device::mr_w )
+void wdxt_gen_device::mr_w(int state)
 {
 	if (state == ASSERT_LINE)
 	{
@@ -199,7 +199,7 @@ wdxt_gen_device::wdxt_gen_device(const machine_config &mconfig, const char *tag,
 void wdxt_gen_device::device_start()
 {
 	set_isa_device();
-	m_isa->install_rom(this, 0xc8000, 0xc9fff, "hdc", "hdc");
+	m_isa->install_rom(this, 0xc8000, 0xc9fff, "hdc");
 	m_isa->install_device(0x0320, 0x0323, read8sm_delegate(*m_host, FUNC(wd11c00_17_device::io_r)), write8sm_delegate(*m_host, FUNC(wd11c00_17_device::io_w)));
 	m_isa->set_dma_channel(3, this, false);
 }
@@ -250,7 +250,7 @@ void wdxt_gen_device::dack_line_w(int line, int state)
 //  wd1015_t1_r -
 //-------------------------------------------------
 
-READ_LINE_MEMBER( wdxt_gen_device::wd1015_t1_r )
+int wdxt_gen_device::wd1015_t1_r()
 {
 	return 0; // TODO
 }

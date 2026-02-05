@@ -1,6 +1,6 @@
 /*
- * Copyright 2011-2019 Branimir Karadzic. All rights reserved.
- * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+ * Copyright 2011-2022 Branimir Karadzic. All rights reserved.
+ * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
 #include "bgfx_p.h"
@@ -17,7 +17,7 @@ namespace bgfx
 #define SPV_OPERAND_7(_a0, _a1, _a2, _a3, _a4, _a5, _a6) SPV_OPERAND_1(_a0), SPV_OPERAND_6(_a1, _a2, _a3, _a4, _a5, _a6)
 #define SPV_OPERAND_8(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7) SPV_OPERAND_1(_a0), SPV_OPERAND_7(_a1, _a2, _a3, _a4, _a5, _a6, _a7)
 #define SPV_OPERAND_9(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _a8) SPV_OPERAND_1(_a0), SPV_OPERAND_8(_a1, _a2, _a3, _a4, _a5, _a6, _a7, _a8)
-#if BX_COMPILER_MSVC
+#if BX_COMPILER_MSVC && (!defined(_MSVC_TRADITIONAL) || _MSVC_TRADITIONAL)
 // Workaround MSVS bug...
 #	define SPV_OPERAND(...) { BX_MACRO_DISPATCHER(SPV_OPERAND_, __VA_ARGS__) BX_VA_ARGS_PASS(__VA_ARGS__) }
 #else
@@ -809,7 +809,7 @@ namespace bgfx
 	const char* getName(SpvDecoration::Enum _enum)
 	{
 		BX_UNUSED(s_spvDecorationInfo);
-		BX_CHECK(_enum <= SpvDecoration::Count, "Unknown decoration id %d.", _enum);
+		BX_ASSERT(_enum <= SpvDecoration::Count, "Unknown decoration id %d.", _enum);
 		return _enum <= SpvDecoration::Count
 			?  s_spvDecoration[_enum]
 			: "?SpvDecoration?"
@@ -839,7 +839,7 @@ namespace bgfx
 
 	const char* getName(SpvStorageClass::Enum _enum)
 	{
-		BX_CHECK(_enum <= SpvStorageClass::Count, "Unknown storage class id %d.", _enum);
+		BX_ASSERT(_enum <= SpvStorageClass::Count, "Unknown storage class id %d.", _enum);
 		return _enum <= SpvStorageClass::Count
 			?  s_spvStorageClass[_enum]
 			: "?SpvStorageClass?"
@@ -895,7 +895,7 @@ namespace bgfx
 
 	const char* getName(SpvBuiltin::Enum _enum)
 	{
-		BX_CHECK(_enum <= SpvBuiltin::Count, "Unknown builtin id %d.", _enum);
+		BX_ASSERT(_enum <= SpvBuiltin::Count, "Unknown builtin id %d.", _enum);
 		return _enum <= SpvBuiltin::Count
 			?  s_spvBuiltin[_enum]
 			: "?SpvBuiltin?"

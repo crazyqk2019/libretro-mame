@@ -2,7 +2,7 @@
 // copyright-holders:Curt Coder
 /*********************************************************************
 
-    formats/ccvf_dsk.c
+    formats/ccvf_dsk.cpp
 
     Compucolor Virtual Floppy Disk Image format
 
@@ -11,6 +11,7 @@
 #include "formats/ccvf_dsk.h"
 
 #include "coretmpl.h" // BIT
+#include "ioprocs.h"
 
 
 ccvf_format::ccvf_format()
@@ -23,17 +24,17 @@ ccvf_format::ccvf_format(const format *_formats)
 	formats = _formats;
 }
 
-const char *ccvf_format::name() const
+const char *ccvf_format::name() const noexcept
 {
 	return "ccvf";
 }
 
-const char *ccvf_format::description() const
+const char *ccvf_format::description() const noexcept
 {
 	return "Compucolor Virtual Floppy Disk Image";
 }
 
-const char *ccvf_format::extensions() const
+const char *ccvf_format::extensions() const noexcept
 {
 	return "ccvf";
 }
@@ -46,13 +47,15 @@ const ccvf_format::format ccvf_format::file_formats[] = {
 	{}
 };
 
-int ccvf_format::identify(io_generic *io, uint32_t form_factor)
+int ccvf_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	char h[36];
+	auto const [err, actual] = read_at(io, 0, h, 36);
+	if (err || (36 != actual))
+		return 0;
 
-	io_generic_read(io, h, 0, 36);
-	if(!memcmp(h, "Compucolor Virtual Floppy Disk Image", 36))
-		return 100;
+	if (!memcmp(h, "Compucolor Virtual Floppy Disk Image", 36))
+		return FIFID_SIGN;
 
 	return 0;
 }
@@ -87,13 +90,17 @@ floppy_image_format_t::desc_e* ccvf_format::get_desc_8n1(const format &f, int &c
 	return desc;
 }
 
-bool ccvf_format::load(io_generic *io, uint32_t form_factor, floppy_image *image)
+bool ccvf_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image &image) const
 {
 	const format &f = formats[0];
 
-	uint64_t size = io_generic_size(io);
-	std::vector<uint8_t> img(size);
-	io_generic_read(io, &img[0], 0, size);
+	uint64_t size;
+	if (io.length(size))
+		return false;
+
+	auto [err, img, actual] = read_at(io, 0, size);
+	if (err || (actual != size))
+		return false;
 
 	std::string ccvf = std::string((const char *)&img[0], size);
 	std::vector<uint8_t> bytes(78720);
@@ -141,14 +148,9 @@ bool ccvf_format::load(io_generic *io, uint32_t form_factor, floppy_image *image
 		generate_track_from_levels(track, 0, buffer, 0, image);
 	}
 
-	image->set_variant(f.variant);
+	image.set_variant(f.variant);
 
 	return true;
 }
 
-bool ccvf_format::supports_save() const
-{
-	return false;
-}
-
-const floppy_format_type FLOPPY_CCVF_FORMAT = &floppy_image_format_creator<ccvf_format>;
+const ccvf_format FLOPPY_CCVF_FORMAT;

@@ -10,7 +10,6 @@
 #include "mc1502_fdc.h"
 
 #include "cpu/i86/i86.h"
-#include "formats/pc_dsk.h"
 
 
 //**************************************************************************
@@ -18,10 +17,6 @@
 //**************************************************************************
 
 DEFINE_DEVICE_TYPE(MC1502_FDC, mc1502_fdc_device, "mc1502_fdc", "MC-1502 floppy")
-
-FLOPPY_FORMATS_MEMBER( mc1502_fdc_device::floppy_formats )
-	FLOPPY_PC_FORMAT
-FLOPPY_FORMATS_END
 
 static void mc1502_floppies(device_slot_interface &device)
 {
@@ -45,8 +40,8 @@ void mc1502_fdc_device::device_add_mconfig(machine_config &config)
 	FD1793(config, m_fdc, 16_MHz_XTAL / 16);
 	m_fdc->intrq_wr_callback().set(FUNC(mc1502_fdc_device::mc1502_fdc_irq_drq));
 	m_fdc->drq_wr_callback().set(FUNC(mc1502_fdc_device::mc1502_fdc_irq_drq));
-	FLOPPY_CONNECTOR(config, "fdc:0", mc1502_floppies, "525qd", mc1502_fdc_device::floppy_formats);
-	FLOPPY_CONNECTOR(config, "fdc:1", mc1502_floppies, "525qd", mc1502_fdc_device::floppy_formats);
+	FLOPPY_CONNECTOR(config, "fdc:0", mc1502_floppies, "525qd", floppy_image_device::default_pc_floppy_formats);
+	FLOPPY_CONNECTOR(config, "fdc:1", mc1502_floppies, "525qd", floppy_image_device::default_pc_floppy_formats);
 }
 
 //-------------------------------------------------
@@ -134,7 +129,7 @@ uint8_t mc1502_fdc_device::mc1502_wd17xx_motor_r()
 	return motor_on;
 }
 
-WRITE_LINE_MEMBER(mc1502_fdc_device::mc1502_fdc_irq_drq)
+void mc1502_fdc_device::mc1502_fdc_irq_drq(int state)
 {
 	if (state)
 		m_isa->set_ready(CLEAR_LINE); // deassert I/O CH RDY
@@ -221,7 +216,7 @@ void mc1502_fdc_device::device_start()
 	m_isa->install_device(0x0048, 0x004b, read8sm_delegate(*m_fdc, FUNC(fd1793_device::read)), write8sm_delegate(*m_fdc, FUNC(fd1793_device::write)));
 	m_isa->install_device(0x004c, 0x004f, read8sm_delegate(*this, FUNC(mc1502_fdc_device::mc1502_fdcv2_r)), write8sm_delegate(*this, FUNC(mc1502_fdc_device::mc1502_fdc_w)));
 
-	motor_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mc1502_fdc_device::motor_callback),this));
+	motor_timer = timer_alloc(FUNC(mc1502_fdc_device::motor_callback), this);
 	motor_on = 0;
 	m_control = 0;
 }

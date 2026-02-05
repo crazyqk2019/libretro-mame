@@ -7,10 +7,11 @@
 
 #include "emu.h"
 #include "sharc.h"
-#include "sharcfe.h"
-#include "sharcdsm.h"
 
-#include "debugger.h"
+#include "sharcdsm.h"
+#include "sharcfe.h"
+
+#include "emuopts.h"
 
 
 #define DISABLE_FAST_REGISTERS      1
@@ -343,7 +344,10 @@ void adsp21062_device::iop_w(offs_t offset, uint32_t data)
 		case 0x1c:
 		{
 			m_core->dma[6].control = data;
-			sharc_iop_delayed_w(0x1c, data, 1);
+			if (data & 0x1)
+			{
+				sharc_iop_delayed_w(0x1c, data, 1);
+			}
 			break;
 		}
 
@@ -362,7 +366,10 @@ void adsp21062_device::iop_w(offs_t offset, uint32_t data)
 		case 0x1d:
 		{
 			m_core->dma[7].control = data;
-			sharc_iop_delayed_w(0x1d, data, 30);
+			if (data & 0x1)
+			{
+				sharc_iop_delayed_w(0x1d, data, 30);
+			}
 			break;
 		}
 
@@ -383,36 +390,33 @@ void adsp21062_device::iop_w(offs_t offset, uint32_t data)
 #include "sharcmem.hxx"
 #include "sharcdma.hxx"
 #include "sharcops.hxx"
-#include "sharcops.h"
 
 
 
 void adsp21062_device::build_opcode_table()
 {
-	int i, j;
-	int num_ops = sizeof(s_sharc_opcode_table) / sizeof(SHARC_OP);
-
-	for (i=0; i < 512; i++)
+	for (int i = 0; i < std::size(m_sharc_op); i++)
 	{
 		m_sharc_op[i] = &adsp21062_device::sharcop_unimplemented;
-	}
 
-	for (i=0; i < 512; i++)
-	{
-		uint16_t op = i << 7;
+		const uint16_t op = i << 7;
 
-		for (j=0; j < num_ops; j++)
+		int j = 0;
+		while (j < s_num_ops)
 		{
-			if ((s_sharc_opcode_table[j].op_mask & op) == s_sharc_opcode_table[j].op_bits)
+			auto &opcode = s_sharc_opcode_table[j++];
+			if ((opcode.op_mask & op) == opcode.op_bits)
 			{
-				if (m_sharc_op[i] != &adsp21062_device::sharcop_unimplemented)
-				{
-					fatalerror("build_opcode_table: table already filled! (i=%04X, j=%d)\n", i, j);
-				}
-				else
-				{
-					m_sharc_op[i] = s_sharc_opcode_table[j].handler;
-				}
+				m_sharc_op[i] = opcode.handler;
+				break;
+			}
+		}
+		while (j < s_num_ops)
+		{
+			auto &opcode = s_sharc_opcode_table[j++];
+			if ((opcode.op_mask & op) == opcode.op_bits)
+			{
+				fatalerror("build_opcode_table: table already filled! (i=%04X, j=%d)\n", i, j);
 			}
 		}
 	}
@@ -470,9 +474,8 @@ void adsp21062_device::external_dma_write(uint32_t address, uint64_t data)
 
 void adsp21062_device::device_start()
 {
-	int saveindex;
-
-	m_core = (sharc_internal_state *)m_cache.alloc_near(sizeof(sharc_internal_state));
+	m_cache.allocate_cache(mconfig().options().drc_rwx());
+	m_core = m_cache.alloc_near<sharc_internal_state>();
 	memset(m_core, 0, sizeof(sharc_internal_state));
 
 	m_program = &space(AS_PROGRAM);
@@ -488,34 +491,22 @@ void adsp21062_device::device_start()
 	m_drcuml->symbol_add(&m_core->pc, sizeof(m_core->pc), "pc");
 	m_drcuml->symbol_add(&m_core->icount, sizeof(m_core->icount), "icount");
 
-	for (int i=0; i < 16; i++)
+	for (int i = 0; i < 16; i++)
 	{
 		char buf[10];
-		sprintf(buf, "r%d", i);
+
+		snprintf(buf, std::size(buf), "r%d", i);
 		m_drcuml->symbol_add(&m_core->r[i], sizeof(m_core->r[i]), buf);
 
-		if (i < 8)
-		{
-			sprintf(buf, "dag_i%d", i);
-			m_drcuml->symbol_add(&m_core->dag1.i[i & 7], sizeof(m_core->dag1.i[i & 7]), buf);
-			sprintf(buf, "dag_m%d", i);
-			m_drcuml->symbol_add(&m_core->dag1.m[i & 7], sizeof(m_core->dag1.m[i & 7]), buf);
-			sprintf(buf, "dag_l%d", i);
-			m_drcuml->symbol_add(&m_core->dag1.l[i & 7], sizeof(m_core->dag1.l[i & 7]), buf);
-			sprintf(buf, "dag_b%d", i);
-			m_drcuml->symbol_add(&m_core->dag1.b[i & 7], sizeof(m_core->dag1.b[i & 7]), buf);
-		}
-		else
-		{
-			sprintf(buf, "dag_i%d", i);
-			m_drcuml->symbol_add(&m_core->dag2.i[i & 7], sizeof(m_core->dag2.i[i & 7]), buf);
-			sprintf(buf, "dag_m%d", i);
-			m_drcuml->symbol_add(&m_core->dag2.m[i & 7], sizeof(m_core->dag2.m[i & 7]), buf);
-			sprintf(buf, "dag_l%d", i);
-			m_drcuml->symbol_add(&m_core->dag2.l[i & 7], sizeof(m_core->dag2.l[i & 7]), buf);
-			sprintf(buf, "dag_b%d", i);
-			m_drcuml->symbol_add(&m_core->dag2.b[i & 7], sizeof(m_core->dag2.b[i & 7]), buf);
-		}
+		SHARC_DAG &dag((i < 8) ? m_core->dag1 : m_core->dag2);
+		snprintf(buf, std::size(buf), "dag_i%d", i);
+		m_drcuml->symbol_add(&dag.i[i & 7], sizeof(dag.i[i & 7]), buf);
+		snprintf(buf, std::size(buf), "dag_m%d", i);
+		m_drcuml->symbol_add(&dag.m[i & 7], sizeof(dag.m[i & 7]), buf);
+		snprintf(buf, std::size(buf), "dag_l%d", i);
+		m_drcuml->symbol_add(&dag.l[i & 7], sizeof(dag.l[i & 7]), buf);
+		snprintf(buf, std::size(buf), "dag_b%d", i);
+		m_drcuml->symbol_add(&dag.b[i & 7], sizeof(dag.b[i & 7]), buf);
 	}
 
 	m_drcuml->symbol_add(&m_core->astat, sizeof(m_core->astat), "astat");
@@ -578,7 +569,7 @@ void adsp21062_device::device_start()
 	m_core->cache_dirty = 1;
 
 
-	m_core->delayed_iop_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(adsp21062_device::sharc_iop_delayed_write_callback), this));
+	m_core->delayed_iop_timer = timer_alloc(FUNC(adsp21062_device::sharc_iop_delayed_write_callback), this);
 
 	for (auto & elem : m_core->dma_op)
 	{
@@ -592,7 +583,7 @@ void adsp21062_device::device_start()
 		elem.pmode = 0;
 		elem.chained_direction = 0;
 		elem.active = false;
-		elem.timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(adsp21062_device::sharc_dma_callback), this));
+		elem.timer = timer_alloc(FUNC(adsp21062_device::sharc_dma_callback), this);
 	}
 
 	for (int i=0; i < 16; i++)
@@ -672,8 +663,8 @@ void adsp21062_device::device_start()
 	m_core->fp1 = 1.0f;
 
 	save_item(NAME(m_core->pc));
-	save_pointer(NAME(&m_core->r[0].r), ARRAY_LENGTH(m_core->r));
-	save_pointer(NAME(&m_core->reg_alt[0].r), ARRAY_LENGTH(m_core->reg_alt));
+	save_pointer(NAME(&m_core->r[0].r), std::size(m_core->r));
+	save_pointer(NAME(&m_core->reg_alt[0].r), std::size(m_core->reg_alt));
 	save_item(NAME(m_core->mrf));
 	save_item(NAME(m_core->mrb));
 
@@ -709,18 +700,15 @@ void adsp21062_device::device_start()
 	save_item(NAME(m_core->dag2_alt.b));
 	save_item(NAME(m_core->dag2_alt.l));
 
-	for (saveindex = 0; saveindex < ARRAY_LENGTH(m_core->dma); saveindex++)
-	{
-		save_item(NAME(m_core->dma[saveindex].control), saveindex);
-		save_item(NAME(m_core->dma[saveindex].int_index), saveindex);
-		save_item(NAME(m_core->dma[saveindex].int_modifier), saveindex);
-		save_item(NAME(m_core->dma[saveindex].int_count), saveindex);
-		save_item(NAME(m_core->dma[saveindex].chain_ptr), saveindex);
-		save_item(NAME(m_core->dma[saveindex].gen_purpose), saveindex);
-		save_item(NAME(m_core->dma[saveindex].ext_index), saveindex);
-		save_item(NAME(m_core->dma[saveindex].ext_modifier), saveindex);
-		save_item(NAME(m_core->dma[saveindex].ext_count), saveindex);
-	}
+	save_item(STRUCT_MEMBER(m_core->dma, control));
+	save_item(STRUCT_MEMBER(m_core->dma, int_index));
+	save_item(STRUCT_MEMBER(m_core->dma, int_modifier));
+	save_item(STRUCT_MEMBER(m_core->dma, int_count));
+	save_item(STRUCT_MEMBER(m_core->dma, chain_ptr));
+	save_item(STRUCT_MEMBER(m_core->dma, gen_purpose));
+	save_item(STRUCT_MEMBER(m_core->dma, ext_index));
+	save_item(STRUCT_MEMBER(m_core->dma, ext_modifier));
+	save_item(STRUCT_MEMBER(m_core->dma, ext_count));
 
 	save_item(NAME(m_core->mode1));
 	save_item(NAME(m_core->mode2));
@@ -737,11 +725,8 @@ void adsp21062_device::device_start()
 	save_item(NAME(m_core->syscon));
 	save_item(NAME(m_core->sysstat));
 
-	for (saveindex = 0; saveindex < ARRAY_LENGTH(m_core->status_stack); saveindex++)
-	{
-		save_item(NAME(m_core->status_stack[saveindex].mode1), saveindex);
-		save_item(NAME(m_core->status_stack[saveindex].astat), saveindex);
-	}
+	save_item(STRUCT_MEMBER(m_core->status_stack, mode1));
+	save_item(STRUCT_MEMBER(m_core->status_stack, astat));
 	save_item(NAME(m_core->status_stkp));
 
 	save_item(NAME(m_core->px));
@@ -754,19 +739,16 @@ void adsp21062_device::device_start()
 	save_item(NAME(m_core->irq_pending));
 	save_item(NAME(m_core->active_irq_num));
 
-	for (saveindex = 0; saveindex < ARRAY_LENGTH(m_core->dma_op); saveindex++)
-	{
-		save_item(NAME(m_core->dma_op[saveindex].src), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].dst), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].chain_ptr), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].src_modifier), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].dst_modifier), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].src_count), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].dst_count), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].pmode), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].chained_direction), saveindex);
-		save_item(NAME(m_core->dma_op[saveindex].active), saveindex);
-	}
+	save_item(STRUCT_MEMBER(m_core->dma_op, src));
+	save_item(STRUCT_MEMBER(m_core->dma_op, dst));
+	save_item(STRUCT_MEMBER(m_core->dma_op, chain_ptr));
+	save_item(STRUCT_MEMBER(m_core->dma_op, src_modifier));
+	save_item(STRUCT_MEMBER(m_core->dma_op, dst_modifier));
+	save_item(STRUCT_MEMBER(m_core->dma_op, src_count));
+	save_item(STRUCT_MEMBER(m_core->dma_op, dst_count));
+	save_item(STRUCT_MEMBER(m_core->dma_op, pmode));
+	save_item(STRUCT_MEMBER(m_core->dma_op, chained_direction));
+	save_item(STRUCT_MEMBER(m_core->dma_op, active));
 
 	save_item(NAME(m_core->dma_status));
 
@@ -983,6 +965,19 @@ void adsp21062_device::set_flag_input(int flag_num, int state)
 	}
 }
 
+void adsp21062_device::write_stall(int state)
+{
+	m_core->write_stalled = (state == 0) ? false : true;
+
+	if (m_enable_drc)
+	{
+		if (m_core->write_stalled)
+			spin_until_trigger(45757);
+		else
+			machine().scheduler().trigger(45757);
+	}
+}
+
 void adsp21062_device::check_interrupts()
 {
 	int i;
@@ -1039,10 +1034,27 @@ void adsp21062_device::execute_run()
 	}
 	else
 	{
+		if (m_core->write_stalled)
+			eat_cycles(m_core->icount);
+
 		if (m_core->idle && m_core->irq_pending == 0)
 		{
+			debugger_wait_hook();
+
+			int dma_count = m_core->icount;
+
+			// run active DMAs even while idling
+			while (dma_count > 0 && m_core->dma_status & ((1 << 6) | (1 << 7)))
+			{
+				if (!m_core->write_stalled)
+				{
+					dma_run_cycle(6);
+					dma_run_cycle(7);
+				}
+				dma_count--;
+			}
+
 			m_core->icount = 0;
-			debugger_instruction_hook(m_core->daddr);
 		}
 		if (m_core->irq_pending != 0)
 		{
@@ -1050,7 +1062,7 @@ void adsp21062_device::execute_run()
 			m_core->idle = 0;
 		}
 
-		while (m_core->icount > 0 && !m_core->idle)
+		while (m_core->icount > 0 && !m_core->idle && !m_core->write_stalled)
 		{
 			m_core->pc = m_core->daddr;
 			m_core->daddr = m_core->faddr;
@@ -1135,6 +1147,12 @@ void adsp21062_device::execute_run()
 				{
 					systemreg_write_latency_effect();
 				}
+			}
+
+			if (!m_core->write_stalled)
+			{
+				dma_run_cycle(6);
+				dma_run_cycle(7);
 			}
 
 			--m_core->icount;

@@ -22,7 +22,7 @@
 #endif
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 #define _FILE_OFFSET_BITS 64
 #endif
 
@@ -40,6 +40,7 @@
 #define _DARWIN_C_SOURCE  // to get DT_xxx on OS X
 
 #include "osdcore.h"
+#include "osdfile.h"
 #include "modules/lib/osdlib.h"
 #include "util/strformat.h"
 
@@ -62,13 +63,13 @@ namespace {
 //  CONSTANTS
 //============================================================
 
-#if defined(WIN32)
+#if defined(_WIN32)
 constexpr char PATHSEPCH = '\\';
 #else
 constexpr char PATHSEPCH = '/';
 #endif
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || defined(__EMSCRIPTEN__) || defined(__ANDROID__) || defined(WIN32) || defined(SDLMAME_NO64BITIO)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || defined(__EMSCRIPTEN__) || defined(__ANDROID__) || defined(_WIN32) || defined(SDLMAME_NO64BITIO)
 using sdl_dirent = struct dirent;
 using sdl_stat = struct stat;
 #define sdl_readdir readdir
@@ -80,7 +81,7 @@ using sdl_stat = struct stat64;
 #define sdl_stat_fn stat64
 #endif
 
-#if (defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__))
+#if (defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || defined(__GLIBC__))
 #define HAS_DT_XXX 1
 #else
 #define HAS_DT_XXX 0
@@ -103,7 +104,16 @@ public:
 	bool open_impl(std::string const &dirname);
 
 private:
-	typedef std::unique_ptr<DIR, int (*)(DIR *)>    dir_ptr;
+	struct dir_deleter
+	{
+		void operator()(DIR *object) const noexcept
+		{
+			if (object)
+				::closedir(object);
+		}
+	};
+
+	using dir_ptr = std::unique_ptr<DIR, dir_deleter>;
 
 	entry       m_entry;
 	sdl_dirent  *m_data;
@@ -119,7 +129,7 @@ private:
 posix_directory::posix_directory()
 	: m_entry()
 	, m_data(nullptr)
-	, m_fd(nullptr, &::closedir)
+	, m_fd(nullptr)
 	, m_path()
 {
 }
@@ -147,7 +157,7 @@ const osd::directory::entry *posix_directory::read()
 	m_entry.name = m_data->d_name;
 
 	sdl_stat st;
-	bool stat_err(0 > sdl_stat_fn(util::string_format("%s%c%s", m_path, PATHSEPCH, m_data->d_name).c_str(), &st));
+	bool stat_err(0 > sdl_stat_fn(util::string_format("%s%c%s", m_path, PATHSEPCH, static_cast<const char *>(m_data->d_name)).c_str(), &st));
 
 #if HAS_DT_XXX
 	switch (m_data->d_type)
@@ -192,7 +202,7 @@ bool posix_directory::open_impl(std::string const &dirname)
 {
 	assert(!m_fd);
 
-	osd_subst_env(m_path, dirname);
+	m_path = dirname;
 	m_fd.reset(::opendir(m_path.c_str()));
 	return bool(m_fd);
 }
@@ -223,7 +233,7 @@ directory::ptr directory::open(std::string const &dirname)
 //  osd_subst_env
 //============================================================
 
-void osd_subst_env(std::string &dst, std::string const &src)
+std::string osd_subst_env(std::string_view src)
 {
 	std::string result, var;
 	auto start = src.begin();
@@ -291,5 +301,5 @@ void osd_subst_env(std::string &dst, std::string const &src)
 		}
 	}
 
-	dst = std::move(result);
+	return result;
 }

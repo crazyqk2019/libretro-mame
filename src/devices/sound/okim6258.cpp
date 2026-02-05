@@ -2,14 +2,14 @@
 // copyright-holders:Barry Rodewald
 /**********************************************************************************************
  *
- *   OKI MSM6258 ADPCM
+ *   OKI MSM6258 ADPCM Speech Processor
  *
  *   TODO:
- *   3-bit ADPCM support
- *   Recording?
+ *   - 3-bit ADPCM support
+ *   - Use okiadpcm.* helper?
+ *   - Recording?
  *
  **********************************************************************************************/
-
 
 #include "emu.h"
 #include "okim6258.h"
@@ -46,19 +46,19 @@ DEFINE_DEVICE_TYPE(OKIM6258, okim6258_device, "okim6258", "OKI MSM6258 ADPCM")
 //  okim6258_device - constructor
 //-------------------------------------------------
 
-okim6258_device::okim6258_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, OKIM6258, tag, owner, clock),
-		device_sound_interface(mconfig, *this),
-		m_status(0),
-		m_start_divider(0),
-		m_divider(512),
-		m_adpcm_type(0),
-		m_data_in(0),
-		m_nibble_shift(0),
-		m_stream(nullptr),
-		m_output_bits(0),
-		m_signal(0),
-		m_step(0)
+okim6258_device::okim6258_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+	device_t(mconfig, OKIM6258, tag, owner, clock),
+	device_sound_interface(mconfig, *this),
+	m_status(0),
+	m_start_divider(0),
+	m_divider(512),
+	m_adpcm_type(0),
+	m_data_in(0),
+	m_nibble_shift(0),
+	m_stream(nullptr),
+	m_output_bits(0),
+	m_signal(0),
+	m_step(0)
 {
 }
 
@@ -93,7 +93,7 @@ static void compute_tables()
 		for (nib = 0; nib < 16; nib++)
 		{
 			diff_lookup[step*16 + nib] = nbl2bit[nib][0] *
-				(stepval   * nbl2bit[nib][1] +
+					(stepval  * nbl2bit[nib][1] +
 					stepval/2 * nbl2bit[nib][2] +
 					stepval/4 * nbl2bit[nib][3] +
 					stepval/8);
@@ -119,7 +119,13 @@ void okim6258_device::device_start()
 	m_signal = -2;
 	m_step = 0;
 
-	state_save_register();
+	// register for savestates
+	save_item(NAME(m_status));
+	save_item(NAME(m_divider));
+	save_item(NAME(m_data_in));
+	save_item(NAME(m_nibble_shift));
+	save_item(NAME(m_signal));
+	save_item(NAME(m_step));
 }
 
 
@@ -141,17 +147,13 @@ void okim6258_device::device_reset()
 //  sound_stream_update - handle a stream update
 //-------------------------------------------------
 
-void okim6258_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void okim6258_device::sound_stream_update(sound_stream &stream)
 {
-	stream_sample_t *buffer = outputs[0];
-
-	memset(outputs[0], 0, samples * sizeof(*outputs[0]));
-
 	if (m_status & STATUS_PLAYING)
 	{
 		int nibble_shift = m_nibble_shift;
 
-		while (samples)
+		for (int sampindex = 0; sampindex < stream.samples(); sampindex++)
 		{
 			/* Compute the new amplitude and update the current step */
 			int nibble = (m_data_in >> nibble_shift) & 0xf;
@@ -161,39 +163,13 @@ void okim6258_device::sound_stream_update(sound_stream &stream, stream_sample_t 
 
 			nibble_shift ^= 4;
 
-			*buffer++ = sample;
-			samples--;
+			stream.put_int(0, sampindex, sample, 32768);
 		}
 
 		/* Update the parameters */
 		m_nibble_shift = nibble_shift;
 	}
-	else
-	{
-		/* Fill with 0 */
-		while (samples--)
-			*buffer++ = 0;
-	}
 }
-
-
-
-/**********************************************************************************************
-
-     state save support for MAME
-
-***********************************************************************************************/
-
-void okim6258_device::state_save_register()
-{
-	save_item(NAME(m_status));
-	save_item(NAME(m_divider));
-	save_item(NAME(m_data_in));
-	save_item(NAME(m_nibble_shift));
-	save_item(NAME(m_signal));
-	save_item(NAME(m_step));
-}
-
 
 int16_t okim6258_device::clock_adpcm(uint8_t nibble)
 {
@@ -222,7 +198,7 @@ int16_t okim6258_device::clock_adpcm(uint8_t nibble)
 
 /**********************************************************************************************
 
-     okim6258::set_divider -- set the master clock divider
+     set_divider -- set the master clock divider
 
 ***********************************************************************************************/
 
@@ -235,7 +211,7 @@ void okim6258_device::set_divider(int val)
 
 /**********************************************************************************************
 
-     okim6258::set_clock -- set the master clock
+     set_clock -- set the master clock
 
 ***********************************************************************************************/
 
@@ -247,7 +223,7 @@ void okim6258_device::device_clock_changed()
 
 /**********************************************************************************************
 
-     okim6258::get_vclk -- get the VCLK/sampling frequency
+     get_vclk -- get the VCLK/sampling frequency
 
 ***********************************************************************************************/
 
@@ -259,7 +235,7 @@ int okim6258_device::get_vclk()
 
 /**********************************************************************************************
 
-     okim6258_status_r -- read the status port of an OKIM6258-compatible chip
+     status_r -- read the status port of an OKIM6258-compatible chip
 
 ***********************************************************************************************/
 
@@ -273,9 +249,10 @@ uint8_t okim6258_device::status_r()
 
 /**********************************************************************************************
 
-     okim6258_data_w -- write to the control port of an OKIM6258-compatible chip
+     data_w -- write to the control port of an OKIM6258-compatible chip
 
 ***********************************************************************************************/
+
 void okim6258_device::data_w(uint8_t data)
 {
 	/* update the stream */
@@ -288,7 +265,7 @@ void okim6258_device::data_w(uint8_t data)
 
 /**********************************************************************************************
 
-     okim6258_ctrl_w -- write to the control port of an OKIM6258-compatible chip
+     ctrl_w -- write to the control port of an OKIM6258-compatible chip
 
 ***********************************************************************************************/
 

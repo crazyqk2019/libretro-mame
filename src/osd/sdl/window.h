@@ -8,17 +8,18 @@
 //
 //============================================================
 
-#ifndef __SDLWINDOW__
-#define __SDLWINDOW__
-
-#include "osdsdl.h"
-#include "video.h"
+#ifndef MAME_OSD_SDL_WINDOW_H
+#define MAME_OSD_SDL_WINDOW_H
 
 #include "modules/osdwindow.h"
+#include "osdsync.h"
 
+#include <SDL2/SDL.h>
+
+#include <chrono>
 #include <cstdint>
 #include <memory>
-#include <list>
+#include <vector>
 
 
 //============================================================
@@ -27,18 +28,18 @@
 
 class render_target;
 
-// forward of SDL_DisplayMode not possible (typedef struct) - define wrapper
-
-class SDL_DM_Wrapper;
-
 typedef uintptr_t HashT;
 
-#define OSDWORK_CALLBACK(name)  void *name(void *param, ATTR_UNUSED int threadid)
+#define OSDWORK_CALLBACK(name)  void *name(void *param, int threadid)
 
 class sdl_window_info : public osd_window_t<SDL_Window*>
 {
 public:
-	sdl_window_info(running_machine &a_machine, int index, std::shared_ptr<osd_monitor_info> a_monitor,
+	sdl_window_info(
+			running_machine &a_machine,
+			render_module &renderprovider,
+			int index,
+			const std::shared_ptr<osd_monitor_info> &a_monitor,
 			const osd_window_config *config);
 
 	~sdl_window_info();
@@ -49,7 +50,7 @@ public:
 	void toggle_full_screen();
 	void modify_prescale(int dir);
 	void resize(int32_t width, int32_t height);
-	void destroy() override;
+	void complete_destroy() override;
 
 	void capture_pointer() override;
 	void release_pointer() override;
@@ -62,20 +63,48 @@ public:
 
 	int xy_to_render_target(int x, int y, int *xt, int *yt);
 
-	running_machine &machine() const override { return m_machine; }
-	osd_monitor_info *monitor() const override { return m_monitor.get(); }
-	int fullscreen() const override { return m_fullscreen; }
-
-	render_target *target() override { return m_target; }
-
-	int prescale() const { return m_prescale; }
-
-	// Pointer to next window
-	sdl_window_info *   m_next;
+	void mouse_entered(unsigned device);
+	void mouse_left(unsigned device);
+	void mouse_down(unsigned device, int x, int y, unsigned button);
+	void mouse_up(unsigned device, int x, int y, unsigned button);
+	void mouse_moved(unsigned device, int x, int y);
+	void mouse_wheel(unsigned device, int y);
+	void finger_down(SDL_FingerID finger, unsigned device, int x, int y);
+	void finger_up(SDL_FingerID finger, unsigned device, int x, int y);
+	void finger_moved(SDL_FingerID finger, unsigned device, int x, int y);
 
 private:
+	struct sdl_pointer_info : public pointer_info
+	{
+		static constexpr bool compare(sdl_pointer_info const &info, SDL_FingerID finger) { return info.finger < finger; }
+
+		sdl_pointer_info(sdl_pointer_info const &) = default;
+		sdl_pointer_info(sdl_pointer_info &&) = default;
+		sdl_pointer_info &operator=(sdl_pointer_info const &) = default;
+		sdl_pointer_info &operator=(sdl_pointer_info &&) = default;
+
+		sdl_pointer_info(SDL_FingerID, unsigned i, unsigned d);
+
+		SDL_FingerID finger;
+	};
+
+	// returns 0 on success, else 1
+	int complete_create();
+
+	int wnd_extra_width();
+	int wnd_extra_height();
+	osd_rect constrain_to_aspect_ratio(const osd_rect &rect, int adjustment);
+	osd_dim get_min_bounds(int constrain);
+	osd_dim get_max_bounds(int constrain);
+	void update_cursor_state();
+	osd_dim pick_best_mode();
+	void set_fullscreen(int afullscreen) { m_fullscreen = afullscreen; }
+
+	void measure_fps(int update);
+
+	std::vector<sdl_pointer_info>::iterator map_pointer(SDL_FingerID finger, unsigned device);
+
 	// window handle and info
-	char                m_title[256];
 	int                 m_startmaximized;
 
 	// dimensions
@@ -84,72 +113,22 @@ private:
 
 	// rendering info
 	osd_event           m_rendered_event;
-	render_target *     m_target;
 
 	// Original display_mode
-	SDL_DM_Wrapper      *m_original_mode;
+	SDL_DisplayMode     m_original_mode;
 
 	int                 m_extra_flags;
 
-	// returns 0 on success, else 1
-	int complete_create();
-	void complete_destroy();
-
-private:
-	int wnd_extra_width();
-	int wnd_extra_height();
-	void set_starting_view(int index, const char *defview, const char *view);
-	osd_rect constrain_to_aspect_ratio(const osd_rect &rect, int adjustment);
-	osd_dim get_min_bounds(int constrain);
-	osd_dim get_max_bounds(int constrain);
-	void update_cursor_state();
-	osd_dim pick_best_mode();
-	void set_fullscreen(int afullscreen) { m_fullscreen = afullscreen; }
-
-	// Pointer to machine
-	running_machine &   m_machine;
-
 	// monitor info
-	std::shared_ptr<osd_monitor_info>  m_monitor;
-	int                                m_fullscreen;
-	bool                               m_mouse_captured;
-	bool                               m_mouse_hidden;
+	bool                m_mouse_captured;
+	bool                m_mouse_hidden;
 
-	void measure_fps(int update);
-
+	// info on currently active pointers - 64 pointers ought to be enough for anyone
+	uint64_t m_pointer_mask;
+	unsigned m_next_pointer;
+	bool m_mouse_inside;
+	std::vector<pointer_dev_info> m_ptrdev_info;
+	std::vector<sdl_pointer_info> m_active_pointers;
 };
 
-struct osd_draw_callbacks
-{
-	osd_renderer *(*create)(osd_window *window);
-};
-
-//============================================================
-//  PROTOTYPES
-//============================================================
-
-//============================================================
-// PROTOTYPES - drawsdl.c
-//============================================================
-
-int drawsdl_scale_mode(const char *s);
-
-//============================================================
-// PROTOTYPES - drawogl.c
-//============================================================
-
-int drawogl_init(running_machine &machine, osd_draw_callbacks *callbacks);
-
-//============================================================
-// PROTOTYPES - draw13.c
-//============================================================
-
-int drawsdl2_init(running_machine &machine, osd_draw_callbacks *callbacks);
-
-//============================================================
-// PROTOTYPES - drawbgfx.c
-//============================================================
-
-int drawbgfx_init(running_machine &machine, osd_draw_callbacks *callbacks);
-
-#endif /* __SDLWINDOW__ */
+#endif // MAME_OSD_SDL_WINDOW_H

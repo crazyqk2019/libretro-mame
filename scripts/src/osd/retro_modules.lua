@@ -50,41 +50,50 @@ function osdmodulesbuild()
 	}
 
 	files {
-		MAME_DIR .. "src/osd/osdnet.cpp",
-		MAME_DIR .. "src/osd/osdnet.h",
 		MAME_DIR .. "src/osd/watchdog.cpp",
 		MAME_DIR .. "src/osd/watchdog.h",
+		MAME_DIR .. "src/osd/interface/audio.cpp",
+		MAME_DIR .. "src/osd/interface/audio.h",
+		MAME_DIR .. "src/osd/interface/inputcode.h",
+		MAME_DIR .. "src/osd/interface/inputman.h",
+		MAME_DIR .. "src/osd/interface/inputseq.cpp",
+		MAME_DIR .. "src/osd/interface/inputseq.h",
+		MAME_DIR .. "src/osd/interface/nethandler.cpp",
+		MAME_DIR .. "src/osd/interface/nethandler.h",
 		MAME_DIR .. "src/osd/modules/debugger/debug_module.h",
-		MAME_DIR .. "src/osd/modules/font/font_module.h",
-		MAME_DIR .. "src/osd/modules/midi/midi_module.h",
-		MAME_DIR .. "src/osd/modules/netdev/netdev_module.h",
-		MAME_DIR .. "src/osd/modules/sound/sound_module.h",
-		MAME_DIR .. "src/osd/modules/diagnostics/diagnostics_module.h",
-		MAME_DIR .. "src/osd/modules/monitor/monitor_module.h",
-		MAME_DIR .. "src/osd/modules/lib/osdobj_common.cpp",
-		MAME_DIR .. "src/osd/modules/lib/osdobj_common.h",
-		MAME_DIR .. "src/osd/modules/diagnostics/none.cpp",
 		MAME_DIR .. "src/osd/modules/debugger/none.cpp",
+		MAME_DIR .. "src/osd/modules/diagnostics/diagnostics_module.h",
+		MAME_DIR .. "src/osd/modules/diagnostics/none.cpp",
+		MAME_DIR .. "src/osd/modules/font/font_module.h",
 		MAME_DIR .. "src/osd/modules/font/font_none.cpp",
-		MAME_DIR .. "src/osd/modules/netdev/taptun.cpp",
-		MAME_DIR .. "src/osd/modules/netdev/pcap.cpp",
-		MAME_DIR .. "src/osd/modules/netdev/none.cpp",
-		MAME_DIR .. "src/osd/modules/midi/none.cpp",
-		MAME_DIR .. "src/osd/modules/sound/none.cpp",
+		MAME_DIR .. "src/osd/modules/input/assignmenthelper.cpp",
+		MAME_DIR .. "src/osd/modules/input/assignmenthelper.h",
 		MAME_DIR .. "src/osd/modules/input/input_module.h",
 		MAME_DIR .. "src/osd/modules/input/input_common.cpp",
 		MAME_DIR .. "src/osd/modules/input/input_common.h",
 		MAME_DIR .. "src/osd/modules/input/input_none.cpp",
 		MAME_DIR .. "src/osd/modules/input/input_retro.cpp",
 		MAME_DIR .. "src/osd/modules/input/input_retro.h",
+		MAME_DIR .. "src/osd/modules/lib/osdobj_common.cpp",
+		MAME_DIR .. "src/osd/modules/lib/osdobj_common.h",
+		MAME_DIR .. "src/osd/modules/midi/midi_module.h",
+		MAME_DIR .. "src/osd/modules/midi/none.cpp",
+		MAME_DIR .. "src/osd/modules/monitor/monitor_common.h",
+		MAME_DIR .. "src/osd/modules/monitor/monitor_common.cpp",
+		MAME_DIR .. "src/osd/modules/monitor/monitor_module.h",
+		MAME_DIR .. "src/osd/modules/monitor/monitor_retro.cpp",
+		MAME_DIR .. "src/osd/modules/netdev/netdev_module.h",
+		MAME_DIR .. "src/osd/modules/netdev/taptun.cpp",
+		MAME_DIR .. "src/osd/modules/netdev/pcap.cpp",
+		MAME_DIR .. "src/osd/modules/netdev/none.cpp",
 		MAME_DIR .. "src/osd/modules/output/output_module.h",
 		MAME_DIR .. "src/osd/modules/output/none.cpp",
 		MAME_DIR .. "src/osd/modules/output/console.cpp",
 		MAME_DIR .. "src/osd/modules/output/network.cpp",
-		MAME_DIR .. "src/osd/modules/monitor/monitor_common.h",
-		MAME_DIR .. "src/osd/modules/monitor/monitor_common.cpp",
-		MAME_DIR .. "src/osd/modules/monitor/monitor_retro.cpp",
+		MAME_DIR .. "src/osd/modules/sound/sound_module.cpp",
+		MAME_DIR .. "src/osd/modules/sound/sound_module.h",
 	}
+
 	includedirs {
 		MAME_DIR .. "3rdparty/asio/include",
 	}
@@ -101,45 +110,24 @@ function osdmodulesbuild()
 	end
 
 	defines {
-			"USE_OPENGL=0",
-		}
-
-
-	defines {
 		"__STDC_LIMIT_MACROS",
 		"__STDC_FORMAT_MACROS",
 		"__STDC_CONSTANT_MACROS",
 		"IMGUI_DISABLE_OBSOLETE_FUNCTIONS",
 	}
 
-	files {
-		MAME_DIR .. "src/osd/modules/render/aviwrite.cpp",
-		MAME_DIR .. "src/osd/modules/render/aviwrite.h",
-
-	}
-	includedirs {
-		MAME_DIR .. "3rdparty/bx/include",
-		MAME_DIR .. "3rdparty/rapidjson/include",
-	}
-
 	defines {
-			"NO_USE_MIDI",
-		}
-
-	defines {
-			"NO_USE_PORTAUDIO",
-		}
-
-	defines {
-			"USE_QTDEBUG=0",
-		}
-
+        "NO_USE_MIDI",
+        "NO_USE_PORTAUDIO",
+        "NO_USE_BGFX",
+        "USE_QTDEBUG=0",
+        "USE_OPENGL=0",
+    }
 
 end
 
 
 function osdmodulestargetconf()
-
 
 	if _OPTIONS["targetos"]=="windows" then
 		links {
@@ -218,6 +206,15 @@ newoption {
 	allowed = {
 		{ "0",  "Enable PortAudio"  },
 		{ "1",  "Disable PortAudio" },
+	},
+}
+
+newoption {
+	trigger = "NO_USE_BGFX",
+	description = "Disable BGFX",
+	allowed = {
+		{ "0",  "Enable BGFX"  },
+		{ "1",  "Disable BGFX" },
 	},
 }
 

@@ -9,8 +9,10 @@
 
 #pragma once
 
-#include "dirom.h"
 #include "scspdsp.h"
+
+#include "dirom.h"
+
 
 #define SCSP_FM_DELAY    0    // delay in number of slots processed before samples are written to the FM ring buffer
 				// driver code indicates should be 4, but sounds distorted then
@@ -35,17 +37,18 @@ public:
 	// MIDI I/O access (used for comms on Model 2/3)
 	void midi_in(u8 data);
 	u16 midi_out_r();
+	void midi_out_w(u8 data);
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 	virtual void device_post_load() override;
 	virtual void device_clock_changed() override;
 
-	virtual void rom_bank_updated() override;
+	virtual void rom_bank_pre_change() override;
 
 	// sound stream update overrides
-	virtual void sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples) override;
+	virtual void sound_stream_update(sound_stream &stream) override;
 
 private:
 	enum SCSP_STATE { SCSP_ATTACK, SCSP_DECAY1, SCSP_DECAY2, SCSP_RELEASE };
@@ -116,6 +119,7 @@ private:
 	u32 m_IrqTimBC;
 	u32 m_IrqMidi;
 
+	u8 m_MidiOutStack[32];
 	u8 m_MidiOutW, m_MidiOutR;
 	u8 m_MidiStack[32];
 	u8 m_MidiW, m_MidiR;
@@ -147,13 +151,6 @@ private:
 	int m_ARTABLE[64], m_DRTABLE[64];
 
 	SCSPDSP m_DSP;
-
-	stream_sample_t *m_bufferl;
-	stream_sample_t *m_bufferr;
-	stream_sample_t *m_exts0;
-	stream_sample_t *m_exts1;
-
-	int m_length;
 
 	s16 *m_RBUFDST;   //this points to where the sample will be stored in the RingBuf
 
@@ -187,7 +184,7 @@ private:
 	void w16(u32 addr, u16 val);
 	u16 r16(u32 addr);
 	inline s32 UpdateSlot(SCSP_SLOT *slot);
-	void DoMasterSamples(int nsamples);
+	void DoMasterSamples(sound_stream &stream);
 
 	//LFO
 	void LFO_Init();

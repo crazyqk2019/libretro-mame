@@ -12,11 +12,13 @@
 #include "corestr.h"
 #include "hashing.h"
 
+#include <cassert>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <cctype>
-#include <cassert>
+#include <tuple>
+#include <type_traits>
 
 #define DEFAULT_SPLIT_SIZE      100
 #define MAX_PARTS               1000
@@ -34,11 +36,19 @@
     hash over a buffer and return a string
 -------------------------------------------------*/
 
-static void compute_hash_as_string(std::string &buffer, void *data, uint32_t length)
+static void compute_hash_as_string(std::string &buffer, const void *data, size_t length)
 {
 	// compute the SHA1
 	util::sha1_creator sha1;
-	sha1.append(data, length);
+	do
+	{
+		// deal with size_t potentially being bigger than 32 bits
+		auto const chunk = std::min<std::common_type_t<size_t, uint32_t> >(length, std::numeric_limits<uint32_t>::max());
+		sha1.append(data, chunk);
+		length -= chunk;
+		data = reinterpret_cast<const uint8_t *>(data) + chunk;
+	}
+	while (length);
 	const util::sha1_t sha1digest = sha1.finish();
 
 	// expand the digest to a string
@@ -66,7 +76,7 @@ static int split_file(const char *filename, const char *basename, uint32_t split
 	void *splitbuffer = nullptr;
 	int index, partnum;
 	uint64_t totallength;
-	osd_file::error filerr;
+	std::error_condition filerr;
 	int error = 1;
 
 	// convert split size to MB
@@ -79,20 +89,24 @@ static int split_file(const char *filename, const char *basename, uint32_t split
 
 	// open the file for read
 	filerr = util::core_file::open(filename, OPEN_FLAG_READ, infile);
-	if (filerr != osd_file::error::NONE)
+	if (filerr)
 	{
 		fprintf(stderr, "Fatal error: unable to open file '%s'\n", filename);
 		goto cleanup;
 	}
 
 	// get the total length
-	totallength = infile->size();
+	if (infile->length(totallength))
+	{
+		fprintf(stderr, "Fatal error: unable to get length of file\n");
+		goto cleanup;
+	}
 	if (totallength < splitsize)
 	{
 		fprintf(stderr, "Fatal error: file is smaller than the split size\n");
 		goto cleanup;
 	}
-	if ((uint64_t)splitsize * MAX_PARTS < totallength)
+	if ((uint64_t(splitsize) * MAX_PARTS) < totallength)
 	{
 		fprintf(stderr, "Fatal error: too many splits (maximum is %d)\n", MAX_PARTS);
 		goto cleanup;
@@ -117,7 +131,7 @@ static int split_file(const char *filename, const char *basename, uint32_t split
 
 	// create the split file
 	filerr = util::core_file::open(splitfilename, OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_NO_BOM, splitfile);
-	if (filerr != osd_file::error::NONE)
+	if (filerr)
 	{
 		fprintf(stderr, "Fatal error: unable to create split file '%s'\n", splitfilename.c_str());
 		goto cleanup;
@@ -133,12 +147,11 @@ static int split_file(const char *filename, const char *basename, uint32_t split
 	// now iterate until done
 	for (partnum = 0; partnum < 1000; partnum++)
 	{
-		uint32_t actual, length;
-
 		printf("Reading part %d...", partnum);
 
 		// read as much as we can from the file
-		length = infile->read(splitbuffer, splitsize);
+		size_t length;
+		std::tie(filerr, length) = read(*infile, splitbuffer, splitsize); // FIXME check error return
 		if (length == 0)
 			break;
 
@@ -149,11 +162,11 @@ static int split_file(const char *filename, const char *basename, uint32_t split
 		splitfile->printf("hash=%s file=%s.%03d\n", computedhash.c_str(), basefilename.c_str(), partnum);
 
 		// compute the full filename for this guy
-		outfilename = string_format("%s.%03d", basename, partnum);
+		outfilename = util::string_format("%s.%03d", basename, partnum);
 
 		// create it
 		filerr = util::core_file::open(outfilename, OPEN_FLAG_WRITE | OPEN_FLAG_CREATE, outfile);
-		if (filerr != osd_file::error::NONE)
+		if (filerr)
 		{
 			printf("\n");
 			fprintf(stderr, "Fatal error: unable to create output file '%s'\n", outfilename.c_str());
@@ -163,8 +176,9 @@ static int split_file(const char *filename, const char *basename, uint32_t split
 		printf(" writing %s.%03d...", basefilename.c_str(), partnum);
 
 		// write the data
-		actual = outfile->write(splitbuffer, length);
-		if (actual != length)
+		size_t actual;
+		std::tie(filerr, actual) = write(*outfile, splitbuffer, length);
+		if (filerr || outfile->flush())
 		{
 			printf("\n");
 			fprintf(stderr, "Fatal error: Error writing output file (out of space?)\n");
@@ -216,7 +230,7 @@ static int join_file(const char *filename, const char *outname, int write_output
 	std::string basepath;
 	util::core_file::ptr outfile, infile, splitfile;
 	void *splitbuffer = nullptr;
-	osd_file::error filerr;
+	std::error_condition filerr;
 	uint32_t splitsize;
 	char buffer[256];
 	int error = 1;
@@ -224,7 +238,7 @@ static int join_file(const char *filename, const char *outname, int write_output
 
 	// open the file for read
 	filerr = util::core_file::open(filename, OPEN_FLAG_READ, splitfile);
-	if (filerr != osd_file::error::NONE)
+	if (filerr)
 	{
 		fprintf(stderr, "Fatal error: unable to open file '%s'\n", filename);
 		goto cleanup;
@@ -236,8 +250,7 @@ static int join_file(const char *filename, const char *outname, int write_output
 		fprintf(stderr, "Fatal error: corrupt or incomplete split file at line:\n%s\n", buffer);
 		goto cleanup;
 	}
-	outfilename.assign(buffer + 10);
-	strtrimspace(outfilename);
+	outfilename.assign(strtrimspace(buffer + 10));
 
 	// compute the base path
 	basepath.assign(filename);
@@ -265,7 +278,7 @@ static int join_file(const char *filename, const char *outname, int write_output
 	{
 		// don't overwrite the original!
 		filerr = util::core_file::open(outfilename, OPEN_FLAG_READ, outfile);
-		if (filerr == osd_file::error::NONE)
+		if (!filerr)
 		{
 			outfile.reset();
 			fprintf(stderr, "Fatal error: output file '%s' already exists\n", outfilename.c_str());
@@ -274,7 +287,7 @@ static int join_file(const char *filename, const char *outname, int write_output
 
 		// open the output for write
 		filerr = util::core_file::open(outfilename, OPEN_FLAG_WRITE | OPEN_FLAG_CREATE, outfile);
-		if (filerr != osd_file::error::NONE)
+		if (filerr)
 		{
 			fprintf(stderr, "Fatal error: unable to create file '%s'\n", outfilename.c_str());
 			goto cleanup;
@@ -286,8 +299,6 @@ static int join_file(const char *filename, const char *outname, int write_output
 	// now iterate through each file
 	while (splitfile->gets(buffer, sizeof(buffer)))
 	{
-		uint32_t length, actual;
-
 		// make sure the hash and filename are in the right place
 		if (strncmp(buffer, "hash=", 5) != 0 || strncmp(buffer + 5 + SHA1_DIGEST_SIZE * 2, " file=", 6) != 0)
 		{
@@ -295,15 +306,15 @@ static int join_file(const char *filename, const char *outname, int write_output
 			goto cleanup;
 		}
 		expectedhash.assign(buffer + 5, SHA1_DIGEST_SIZE * 2);
-		infilename.assign(buffer + 5 + SHA1_DIGEST_SIZE * 2 + 6);
-		strtrimspace(infilename);
+		infilename.assign(strtrimspace(buffer + 5 + SHA1_DIGEST_SIZE * 2 + 6));
 
 		printf("  Reading file '%s'...", infilename.c_str());
 
 		// read the file's contents
 		infilename.insert(0, basepath);
+		size_t length;
 		filerr = util::core_file::load(infilename.c_str(), &splitbuffer, length);
-		if (filerr != osd_file::error::NONE)
+		if (filerr)
 		{
 			printf("\n");
 			fprintf(stderr, "Fatal error: unable to load file '%s'\n", infilename.c_str());
@@ -326,8 +337,9 @@ static int join_file(const char *filename, const char *outname, int write_output
 		{
 			printf(" writing...");
 
-			actual = outfile->write(splitbuffer, length);
-			if (actual != length)
+			size_t actual;
+			std::tie(filerr, actual) = write(*outfile, splitbuffer, length);
+			if (filerr || outfile->flush())
 			{
 				printf("\n");
 				fprintf(stderr, "Fatal error: Error writing output file (out of space?)\n");

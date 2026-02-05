@@ -12,9 +12,11 @@
 
 **********************************************************************/
 
-
 #include "emu.h"
 #include "cv1797.h"
+
+#include "formats/acorn_dsk.h"
+#include "formats/fsd_dsk.h"
 
 
 //**************************************************************************
@@ -28,11 +30,13 @@ DEFINE_DEVICE_TYPE(BBC_CV1797, bbc_cv1797_device,  "bbc_cv1797", "Computer Villa
 //  FLOPPY_FORMATS( floppy_formats )
 //-------------------------------------------------
 
-FLOPPY_FORMATS_MEMBER( bbc_cv1797_device::floppy_formats )
-	FLOPPY_ACORN_SSD_FORMAT,
-	FLOPPY_ACORN_DSD_FORMAT,
-	FLOPPY_FSD_FORMAT
-FLOPPY_FORMATS_END
+void bbc_cv1797_device::floppy_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_ACORN_SSD_FORMAT);
+	fr.add(FLOPPY_ACORN_DSD_FORMAT);
+	fr.add(FLOPPY_FSD_FORMAT);
+}
 
 static void bbc_floppies_525(device_slot_interface &device)
 {
@@ -142,12 +146,12 @@ void bbc_cv1797_device::write(offs_t offset, uint8_t data)
 	}
 }
 
-WRITE_LINE_MEMBER(bbc_cv1797_device::fdc_sso_w)
+void bbc_cv1797_device::fdc_sso_w(int state)
 {
 	// TODO: schematic required to confirm usage.
 }
 
-WRITE_LINE_MEMBER(bbc_cv1797_device::fdc_hld_w)
+void bbc_cv1797_device::fdc_hld_w(int state)
 {
 	if (m_floppy)
 		m_floppy->mon_w(!state);

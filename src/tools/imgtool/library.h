@@ -4,39 +4,44 @@
 
     library.h
 
-    Code relevant to the Imgtool library; analogous to the MESS/MAME driver
-    list.
+    Code relevant to the Imgtool library; analogous to the MAME driver list.
 
-    Unlike MESS and MAME which have static driver lists, Imgtool has a
-    concept of a library and this library is built at startup time.
+    Unlike MAME which has a static driver lists, Imgtool has a concept of a
+    library and this library is built at startup time.
     dynamic for which modules are added to.  This makes "dynamic" modules
     much easier
 
 ****************************************************************************/
+#ifndef MAME_TOOLS_IMGTOOL_LIBRARY_H
+#define MAME_TOOLS_IMGTOOL_LIBRARY_H
 
-#ifndef LIBRARY_H
-#define LIBRARY_H
+#pragma once
 
-#include <ctime>
-#include <list>
-#include <chrono>
+#include "imgterrs.h"
 
-#include "corestr.h"
-#include "opresolv.h"
-#include "stream.h"
-#include "unicode.h"
-#include "charconv.h"
-#include "pool.h"
 #include "timeconv.h"
+#include "utilfwd.h"
 
-namespace imgtool
-{
-	class image;
-	class partition;
-	class directory;
-};
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <ctime>
+#include <iosfwd>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
-enum imgtool_suggestion_viability_t
+
+namespace imgtool {
+
+class image;
+class partition;
+class directory;
+class charconverter;
+class stream;
+
+enum suggestion_viability_t
 {
 	SUGGESTION_END,
 	SUGGESTION_POSSIBLE,
@@ -52,76 +57,147 @@ union filterinfo
 
 	imgtoolerr_t (*read_file)(imgtool::partition &partition, const char *filename, const char *fork, imgtool::stream &destf);
 	imgtoolerr_t (*write_file)(imgtool::partition &partition, const char *filename, const char *fork, imgtool::stream &sourcef, util::option_resolution *opts);
-	imgtoolerr_t (*check_stream)(imgtool::stream &stream, imgtool_suggestion_viability_t *viability);
+	imgtoolerr_t (*check_stream)(imgtool::stream &stream, suggestion_viability_t *viability);
 };
 
 typedef void (*filter_getinfoproc)(uint32_t state, union filterinfo *info);
 
-namespace imgtool
+class datetime
 {
-	class datetime
+public:
+	typedef util::arbitrary_clock<std::int64_t, 1600, 1, 1, 0, 0, 0, std::ratio<1, 10000000> > imgtool_clock;
+
+	enum datetime_type
 	{
-	public:
-		typedef util::arbitrary_clock<std::int64_t, 1600, 1, 1, 0, 0, 0, std::ratio<1, 10000000> > imgtool_clock;
-
-		enum datetime_type
-		{
-			NONE,
-			LOCAL,
-			GMT
-		};
-
-		datetime()
-			: m_type(datetime_type::NONE)
-		{
-		}
-
-
-		template<typename Rep, int Y, int M, int D, int H, int N, int S, typename Ratio>
-		datetime(datetime_type type, std::chrono::time_point<util::arbitrary_clock<Rep, Y, M, D, H, N, S, Ratio> > tp)
-			: m_type(type)
-			, m_time_point(imgtool_clock::from_arbitrary_time_point(tp))
-		{
-		}
-
-		datetime(datetime_type type, std::chrono::time_point<std::chrono::system_clock> tp);
-		datetime(datetime_type type, time_t t);
-		datetime(datetime_type type, const util::arbitrary_datetime &dt, bool clamp = true);
-		datetime(const datetime &that) = default;
-		datetime(datetime &&that) = default;
-
-		// accessors
-		datetime_type type() const { return m_type; }
-		bool empty() const { return type() == datetime_type::NONE; }
-		std::chrono::time_point<imgtool_clock> time_point() const { return m_time_point; }
-
-		// operators
-		datetime &operator =(const datetime &that)
-		{
-			m_type = that.m_type;
-			m_time_point = that.m_time_point;
-			return *this;
-		}
-
-		// returns the current time
-		static datetime now(datetime_type type);
-
-		// returns time structures
-		std::tm localtime() const;
-		std::tm gmtime() const;
-		time_t to_time_t() const;
-
-	private:
-		static imgtool_clock::duration          s_gmt_offset;
-		datetime_type                           m_type;
-		std::chrono::time_point<imgtool_clock>  m_time_point;
-
-		static imgtool_clock::duration calculate_gmt_offset();
+		NONE,
+		LOCAL,
+		GMT
 	};
+
+	datetime()
+		: m_type(datetime_type::NONE)
+	{
+	}
+
+
+	template<typename Rep, int Y, int M, int D, int H, int N, int S, typename Ratio>
+	datetime(datetime_type type, std::chrono::time_point<util::arbitrary_clock<Rep, Y, M, D, H, N, S, Ratio> > tp)
+		: m_type(type)
+		, m_time_point(imgtool_clock::from_arbitrary_time_point(tp))
+	{
+	}
+
+	datetime(datetime_type type, std::chrono::time_point<std::chrono::system_clock> tp);
+	datetime(datetime_type type, time_t t);
+	datetime(datetime_type type, const util::arbitrary_datetime &dt, bool clamp = true);
+	datetime(const datetime &that) = default;
+	datetime(datetime &&that) = default;
+
+	// accessors
+	datetime_type type() const { return m_type; }
+	bool empty() const { return type() == datetime_type::NONE; }
+	std::chrono::time_point<imgtool_clock> time_point() const { return m_time_point; }
+
+	// operators
+	datetime &operator =(const datetime &that)
+	{
+		m_type = that.m_type;
+		m_time_point = that.m_time_point;
+		return *this;
+	}
+
+	// returns the current time
+	static datetime now(datetime_type type);
+
+	// returns time structures
+	std::tm localtime() const;
+	std::tm gmtime() const;
+	time_t to_time_t() const;
+
+private:
+	static imgtool_clock::duration          s_gmt_offset;
+	datetime_type                           m_type;
+	std::chrono::time_point<imgtool_clock>  m_time_point;
+
+	static imgtool_clock::duration calculate_gmt_offset();
 };
+
+
+class fork_entry
+{
+public:
+	enum class type_t
+	{
+		DATA,
+		RESOURCE,
+		ALT
+	};
+
+	fork_entry(uint64_t size, type_t type = type_t::DATA)
+		: m_size(size)
+		, m_type(type)
+		, m_name(default_name(type))
+	{
+
+	}
+
+	fork_entry(uint64_t size, std::string &&name)
+		: m_size(size)
+		, m_type(fork_entry::type_t::ALT)
+		, m_name(std::move(name))
+	{
+	}
+
+	fork_entry(const fork_entry &that) = default;
+	fork_entry(fork_entry &&that) = default;
+
+	uint64_t size() const { return m_size; }
+	type_t type() const { return m_type; }
+	const std::string &name() const { return m_name; }
+
+private:
+	static std::string default_name(type_t type)
+	{
+		switch (type)
+		{
+		case type_t::DATA:
+			return std::string("");
+		case type_t::RESOURCE:
+			return std::string("RESOURCE_FORK");
+		default:
+			throw false;
+		}
+	}
+
+	uint64_t    m_size;
+	type_t      m_type;
+	std::string m_name;
+};
+
+struct transfer_suggestion
+{
+	suggestion_viability_t viability;
+	filter_getinfoproc filter;
+	const char *fork;
+	const char *description;
+};
+
+} // namespace imgtool
 
 struct imgtool_dirent
 {
+	imgtool_dirent()
+	{
+		std::fill(std::begin(filename), std::end(filename), 0);
+		std::fill(std::begin(attr), std::end(attr), 0);
+		filesize = 0;
+
+		std::fill(std::begin(softlink), std::end(softlink), 0);
+		std::fill(std::begin(comment), std::end(comment), 0);
+
+		eof = corrupt = directory = hardlink = 0;
+	}
+
 	char filename[1024];
 	char attr[64];
 	uint64_t filesize;
@@ -138,74 +214,6 @@ struct imgtool_dirent
 	unsigned int corrupt : 1;
 	unsigned int directory : 1;
 	unsigned int hardlink : 1;
-};
-
-struct imgtool_chainent
-{
-	uint8_t level;
-	uint64_t block;
-};
-
-namespace imgtool
-{
-	class fork_entry
-	{
-	public:
-		enum class type_t
-		{
-			DATA,
-			RESOURCE,
-			ALT
-		};
-
-		fork_entry(uint64_t size, type_t type = type_t::DATA)
-			: m_size(size)
-			, m_type(type)
-			, m_name(default_name(type))
-		{
-
-		}
-
-		fork_entry(uint64_t size, std::string &&name)
-			: m_size(size)
-			, m_type(fork_entry::type_t::ALT)
-			, m_name(std::move(name))
-		{
-		}
-
-		fork_entry(const fork_entry &that) = default;
-		fork_entry(fork_entry &&that) = default;
-
-		uint64_t size() const { return m_size; }
-		type_t type() const { return m_type; }
-		const std::string &name() const { return m_name; }
-
-	private:
-		static std::string default_name(type_t type)
-		{
-			switch (type)
-			{
-			case type_t::DATA:
-				return std::string("");
-			case type_t::RESOURCE:
-				return std::string("RESOURCE_FORK");
-			default:
-				throw false;
-			}
-		}
-
-		uint64_t    m_size;
-		type_t      m_type;
-		std::string m_name;
-	};
-}
-
-struct imgtool_transfer_suggestion
-{
-	imgtool_suggestion_viability_t viability;
-	filter_getinfoproc filter;
-	const char *fork;
-	const char *description;
 };
 
 enum
@@ -297,7 +305,6 @@ enum
 	IMGTOOLINFO_PTR_ATTR_NAME,
 	IMGTOOLINFO_PTR_GET_ICON_INFO,
 	IMGTOOLINFO_PTR_SUGGEST_TRANSFER,
-	IMGTOOLINFO_PTR_GET_CHAIN,
 	IMGTOOLINFO_PTR_GET_GEOMETRY,
 	IMGTOOLINFO_PTR_READ_SECTOR,
 	IMGTOOLINFO_PTR_WRITE_SECTOR,
@@ -381,9 +388,9 @@ union imgtoolinfo
 	void *  f;                                          /* generic function pointers */
 	char *  s;                                          /* generic strings */
 
-	imgtoolerr_t    (*open)             (imgtool::image &image, imgtool::stream::ptr &&stream);
+	imgtoolerr_t    (*open)             (imgtool::image &image, std::unique_ptr<imgtool::stream> &&stream);
 	void            (*close)            (imgtool::image &image);
-	imgtoolerr_t    (*create)           (imgtool::image &image, imgtool::stream::ptr &&stream, util::option_resolution *opts);
+	imgtoolerr_t    (*create)           (imgtool::image &image, std::unique_ptr<imgtool::stream> &&stream, util::option_resolution *opts);
 	imgtoolerr_t    (*create_partition) (imgtool::image &image, uint64_t first_block, uint64_t block_count);
 	void            (*info)             (imgtool::image &image, std::ostream &stream);
 	imgtoolerr_t    (*begin_enum)       (imgtool::directory &enumeration, const char *path);
@@ -402,8 +409,7 @@ union imgtoolinfo
 	imgtoolerr_t    (*set_attrs)        (imgtool::partition &partition, const char *path, const uint32_t *attrs, const imgtool_attribute *values);
 	imgtoolerr_t    (*attr_name)        (uint32_t attribute, const imgtool_attribute *attr, char *buffer, size_t buffer_len);
 	imgtoolerr_t    (*get_iconinfo)     (imgtool::partition &partition, const char *path, imgtool_iconinfo *iconinfo);
-	imgtoolerr_t    (*suggest_transfer) (imgtool::partition &partition, const char *path, imgtool_transfer_suggestion *suggestions, size_t suggestions_length);
-	imgtoolerr_t    (*get_chain)        (imgtool::partition &partition, const char *path, imgtool_chainent *chain, size_t chain_size);
+	imgtoolerr_t    (*suggest_transfer) (imgtool::partition &partition, const char *path, imgtool::transfer_suggestion *suggestions, size_t suggestions_length);
 	imgtoolerr_t    (*get_geometry)     (imgtool::image &image, uint32_t *tracks, uint32_t *heads, uint32_t *sectors);
 	imgtoolerr_t    (*read_sector)      (imgtool::image &image, uint32_t track, uint32_t head, uint32_t sector, std::vector<uint8_t> &buffer);
 	imgtoolerr_t    (*write_sector)     (imgtool::image &image, uint32_t track, uint32_t head, uint32_t sector, const void *buffer, size_t len, int ddam);
@@ -459,39 +465,39 @@ char *imgtool_temp_str(void);
 
 struct imgtool_module
 {
-	imgtool_class imgclass;
+	imgtool_class imgclass = { 0 };
 
-	const char *name;
-	const char *description;
-	const char *extensions;
-	const char *eoln;
+	std::string name;
+	std::string description;
+	std::string extensions;
+	std::string eoln;
 
-	size_t image_extra_bytes;
+	size_t image_extra_bytes = 0;
 
 	/* flags */
-	unsigned int initial_path_separator : 1;
-	unsigned int open_is_strict : 1;
-	unsigned int tracks_are_called_cylinders : 1;   /* used for hard drivers */
-	unsigned int writing_untested : 1;              /* used when we support writing, but not in main build */
-	unsigned int creation_untested : 1;             /* used when we support creation, but not in main build */
+	bool initial_path_separator = false;
+	bool open_is_strict = false;
+	bool tracks_are_called_cylinders = false;    /* used for hard drivers */
+	bool writing_untested = false;               /* used when we support writing, but not in main build */
+	bool creation_untested = false;              /* used when we support creation, but not in main build */
 
-	imgtoolerr_t    (*open)         (imgtool::image &image, imgtool::stream::ptr &&stream);
-	void            (*close)        (imgtool::image &image);
-	void            (*info)         (imgtool::image &image, std::ostream &stream);
-	imgtoolerr_t    (*create)       (imgtool::image &image, imgtool::stream::ptr &&stream, util::option_resolution *opts);
-	imgtoolerr_t    (*get_geometry) (imgtool::image &image, uint32_t *track, uint32_t *heads, uint32_t *sectors);
-	imgtoolerr_t    (*read_sector)  (imgtool::image &image, uint32_t track, uint32_t head, uint32_t sector, std::vector<uint8_t> &buffer);
-	imgtoolerr_t    (*write_sector) (imgtool::image &image, uint32_t track, uint32_t head, uint32_t sector, const void *buffer, size_t len);
-	imgtoolerr_t    (*read_block)   (imgtool::image &image, void *buffer, uint64_t block);
-	imgtoolerr_t    (*write_block)  (imgtool::image &image, const void *buffer, uint64_t block);
-	imgtoolerr_t    (*list_partitions)(imgtool::image &image, std::vector<imgtool::partition_info> &partitions);
+	imgtoolerr_t    (*open)         (imgtool::image &image, std::unique_ptr<imgtool::stream> &&stream) = nullptr;
+	void            (*close)        (imgtool::image &image) = nullptr;
+	void            (*info)         (imgtool::image &image, std::ostream &stream) = nullptr;
+	imgtoolerr_t    (*create)       (imgtool::image &image, std::unique_ptr<imgtool::stream> &&stream, util::option_resolution *opts) = nullptr;
+	imgtoolerr_t    (*get_geometry) (imgtool::image &image, uint32_t *track, uint32_t *heads, uint32_t *sectors) = nullptr;
+	imgtoolerr_t    (*read_sector)  (imgtool::image &image, uint32_t track, uint32_t head, uint32_t sector, std::vector<uint8_t> &buffer) = nullptr;
+	imgtoolerr_t    (*write_sector) (imgtool::image &image, uint32_t track, uint32_t head, uint32_t sector, const void *buffer, size_t len) = nullptr;
+	imgtoolerr_t    (*read_block)   (imgtool::image &image, void *buffer, uint64_t block) = nullptr;
+	imgtoolerr_t    (*write_block)  (imgtool::image &image, const void *buffer, uint64_t block) = nullptr;
+	imgtoolerr_t    (*list_partitions)(imgtool::image &image, std::vector<imgtool::partition_info> &partitions) = nullptr;
 
-	uint32_t block_size;
+	uint32_t block_size = 0;
 
-	const util::option_guide *createimage_optguide;
-	const char *createimage_optspec;
+	const util::option_guide *createimage_optguide = nullptr;
+	std::string createimage_optspec;
 
-	const void *extra;
+	const void *extra = nullptr;
 };
 
 namespace imgtool {
@@ -531,7 +537,6 @@ public:
 	const modulelist &modules() { return m_modules; }
 
 private:
-	object_pool *   m_pool;
 	modulelist      m_modules;
 
 	// internal lookup and iteration
@@ -540,13 +545,8 @@ private:
 	// helpers
 	void add_class(const imgtool_class *imgclass);
 	int module_compare(const imgtool_module *m1, const imgtool_module *m2, sort_type sort);
-
-	// memory allocators for pooled library memory (these should go away in further C++-ification)
-	void *imgtool_library_malloc(size_t mem);
-	char *imgtool_library_strdup(const char *s);
-	char *imgtool_library_strdup_allow_null(const char *s);
 };
 
 } // namespace imgtool
 
-#endif // LIBRARY_H
+#endif // MAME_TOOLS_IMGTOOL_LIBRARY_H

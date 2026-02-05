@@ -5,14 +5,12 @@
  *   Xerox AltoII CPU core interface
  *
  *****************************************************************************/
-#ifndef MAME_DEVICES_CPU_ALTO2_H
-#define MAME_DEVICES_CPU_ALTO2_H
+#ifndef MAME_CPU_ALTO2_ALTO2CPU_H
+#define MAME_CPU_ALTO2_ALTO2CPU_H
 
 #pragma once
 
 #include "machine/diablo_hd.h"
-
-#include "debugger.h"
 
 #define ALTO2_TAG "alto2"
 
@@ -209,9 +207,9 @@ public:
 
 protected:
 	//! device-level override for start
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 	//! device-level override for reset
-	virtual void device_reset() override;
+	virtual void device_reset() override ATTR_COLD;
 
 	//! device-level override for post reset
 	void interface_post_reset() override;
@@ -219,7 +217,6 @@ protected:
 	//! device_execute_interface overrides
 	virtual uint32_t execute_min_cycles() const noexcept override { return 1; }
 	virtual uint32_t execute_max_cycles() const noexcept override { return 1; }
-	virtual uint32_t execute_input_lines() const noexcept override { return 1; }
 	virtual void execute_run() override;
 	virtual void execute_set_input(int inputnum, int state) override;
 
@@ -227,7 +224,7 @@ protected:
 	virtual space_config_vector memory_space_config() const override;
 
 	//! device (P)ROMs
-	virtual const tiny_rom_entry *device_rom_region() const override;
+	virtual const tiny_rom_entry *device_rom_region() const override ATTR_COLD;
 	//! device_state_interface overrides
 	virtual void state_string_export(const device_state_entry &entry, std::string &str) const override;
 
@@ -251,13 +248,13 @@ private:
 	uint32_t m_ucode_size;                    //!< Size of both, CROM and CRAM together
 	uint32_t m_sreg_banks;                    //!< Number of S register banks; derived from m_cram_config
 
-	uint8_t* m_ucode_crom;
-	std::unique_ptr<uint8_t[]> m_ucode_cram;
-	uint8_t* m_const_data;
+	std::unique_ptr<uint32_t[]> m_ucode_crom;
+	std::unique_ptr<uint32_t[]> m_ucode_cram;
+	std::unique_ptr<uint16_t[]> m_const_data;
 
-	void ucode_map(address_map &map);
-	void const_map(address_map &map);
-	void iomem_map(address_map &map);
+	void ucode_map(address_map &map) ATTR_COLD;
+	void const_map(address_map &map) ATTR_COLD;
+	void iomem_map(address_map &map) ATTR_COLD;
 
 	//! read microcode CROM or CRAM, depending on m_ucode_ram_base
 	uint32_t crom_cram_r(offs_t offset);
@@ -655,7 +652,7 @@ private:
 	 * access it. Also both, address and data lines, are inverted.
 	 * </PRE>
 	 */
-	uint8_t* m_ctl2k_u3;
+	std::unique_ptr<uint8_t[]> m_ctl2k_u3;
 
 	/**
 	 * @brief 2KCTL PROM u38; 82S23; 32x8 bit
@@ -704,7 +701,7 @@ private:
 	 *  B7     9      NEXT[06]'
 	 * </PRE>
 	 */
-	uint8_t* m_ctl2k_u38;
+	std::unique_ptr<uint8_t[]> m_ctl2k_u38;
 
 	//! output lines of the 2KCTL U38 PROM
 	enum {
@@ -776,22 +773,22 @@ private:
 	 * depending on the current NEXT[01]' level.
 	 * </PRE>
 	 */
-	uint8_t* m_ctl2k_u76;
+	std::unique_ptr<uint8_t[]> m_ctl2k_u76;
 
 	/**
 	 * @brief 3k CRAM PROM a37
 	 */
-	uint8_t* m_cram3k_a37;
+	std::unique_ptr<uint8_t[]> m_cram3k_a37;
 
 	/**
 	 * @brief memory addressing PROM a64
 	 */
-	uint8_t* m_madr_a64;
+	std::unique_ptr<uint8_t[]> m_madr_a64;
 
 	/**
 	 * @brief memory addressing PROM a65
 	 */
-	uint8_t* m_madr_a65;
+	std::unique_ptr<uint8_t[]> m_madr_a65;
 
 	/**
 	 * @brief unused PROM a90
@@ -806,7 +803,7 @@ private:
 	 *
 	 * I haven't found yet where KP3-KP5 are used
 	 */
-	uint8_t* m_madr_a90;
+	std::unique_ptr<uint8_t[]> m_madr_a90;
 
 	/**
 	 * @brief unused PROM a91
@@ -833,12 +830,12 @@ private:
 	 * KE(6)    KB(^L)  KB(RTN) KB(")   KB(/)   KB(S3)  KB(<-)    KB(])  KB(\)
 	 * KE(7)    KB(S1)  KB(DEL) KB(S2)  KB(LF)  KB(S4)  KB(S5)   KB(BW) KB(BS)
 	 */
-	uint8_t* m_madr_a91;
+	std::unique_ptr<uint8_t[]> m_madr_a91;
 
 	/**
 	 * @brief ALU function to 74181 operation lookup PROM
 	 */
-	uint8_t* m_alu_a10;
+	std::unique_ptr<uint8_t[]> m_alu_a10;
 
 	//! output lines of the ALU a10 PROM
 	enum {
@@ -935,4 +932,4 @@ private:
 
 DECLARE_DEVICE_TYPE(ALTO2, alto2_cpu_device)
 
-#endif // MAME_DEVICES_CPU_ALTO2_H
+#endif // MAME_CPU_ALTO2_ALTO2CPU_H

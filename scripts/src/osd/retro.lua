@@ -96,16 +96,9 @@ project ("osd_" .. _OPTIONS["osd"])
 		MAME_DIR .. "src/osd/modules/file",
 		MAME_DIR .. "src/osd/modules/render",
 		MAME_DIR .. "3rdparty",
-		MAME_DIR .. "3rdparty/bgfx/include",
 		MAME_DIR .. "src/osd/libretro",
 		MAME_DIR .. "src/osd/libretro/libretro-internal",
 	}
-
-	if _OPTIONS["targetos"]=="windows" then
-		files {
-	--		MAME_DIR .. "src/osd/windows/main.cpp",
-		}
-	end
 
 	files {
 		MAME_DIR .. "src/osd/libretro/libretro-internal/retro_init.cpp",
@@ -187,7 +180,6 @@ project ("ocore_" .. _OPTIONS["osd"])
 	if BASE_TARGETOS=="unix" then
 		files {
 			MAME_DIR .. "src/osd/modules/file/posixdir.cpp",
-            MAME_DIR .. "src/osd/modules/file/posixdomain.cpp",
 			MAME_DIR .. "src/osd/modules/file/posixfile.cpp",
 			MAME_DIR .. "src/osd/modules/file/posixfile.h",
 			MAME_DIR .. "src/osd/modules/file/posixptty.cpp",

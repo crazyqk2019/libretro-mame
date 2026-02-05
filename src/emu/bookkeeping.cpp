@@ -11,6 +11,8 @@
 #include "emu.h"
 #include "config.h"
 
+#include "xmlfile.h"
+
 
 //**************************************************************************
 //  BOOKKEEPING MANAGER
@@ -20,11 +22,11 @@
 //  bookkeeping_manager - constructor
 //-------------------------------------------------
 
-bookkeeping_manager::bookkeeping_manager(running_machine &machine)
-	: m_machine(machine),
-		m_dispensed_tickets(0)
+bookkeeping_manager::bookkeeping_manager(running_machine &machine) :
+	m_machine(machine),
+	m_dispensed_tickets(0)
 {
-	/* reset coin counters */
+	// reset coin counters
 	for (int counternum = 0; counternum < COIN_COUNTERS; counternum++)
 	{
 		m_lastcoin[counternum] = 0;
@@ -39,7 +41,9 @@ bookkeeping_manager::bookkeeping_manager(running_machine &machine)
 	machine.save().save_item(NAME(m_dispensed_tickets));
 
 	// register for configuration
-	machine.configuration().config_register("counters", config_load_delegate(&bookkeeping_manager::config_load, this), config_save_delegate(&bookkeeping_manager::config_save, this));
+	machine.configuration().config_register("counters",
+			configuration_manager::load_delegate(&bookkeeping_manager::config_load, this),
+			configuration_manager::save_delegate(&bookkeeping_manager::config_save, this));
 }
 
 
@@ -47,6 +51,16 @@ bookkeeping_manager::bookkeeping_manager(running_machine &machine)
 /***************************************************************************
     TICKETS
 ***************************************************************************/
+
+/*-------------------------------------------------
+    increment_dispensed_tickets - increment the
+    number of dispensed tickets
+-------------------------------------------------*/
+
+void bookkeeping_manager::increment_dispensed_tickets(int delta)
+{
+	m_dispensed_tickets += delta;
+}
 
 /*-------------------------------------------------
     get_dispensed_tickets - return the number of
@@ -60,13 +74,13 @@ int bookkeeping_manager::get_dispensed_tickets() const
 
 
 /*-------------------------------------------------
-    increment_dispensed_tickets - increment the
-    number of dispensed tickets
+    reset_dispensed_tickets - reset the number of
+    tickets dispensed
 -------------------------------------------------*/
 
-void bookkeeping_manager::increment_dispensed_tickets(int delta)
+void bookkeeping_manager::reset_dispensed_tickets()
 {
-	m_dispensed_tickets += delta;
+	m_dispensed_tickets = 0;
 }
 
 
@@ -80,36 +94,30 @@ void bookkeeping_manager::increment_dispensed_tickets(int delta)
     and tickets
 -------------------------------------------------*/
 
-void bookkeeping_manager::config_load(config_type cfg_type, util::xml::data_node const *parentnode)
+void bookkeeping_manager::config_load(config_type cfg_type, config_level cfg_level, util::xml::data_node const *parentnode)
 {
-	util::xml::data_node const *coinnode, *ticketnode;
-
-	/* on init, reset the counters */
+	// on init, reset the counters
 	if (cfg_type == config_type::INIT)
 	{
 		memset(m_coin_count, 0, sizeof(m_coin_count));
 		m_dispensed_tickets = 0;
 	}
 
-	/* only care about game-specific data */
-	if (cfg_type != config_type::GAME)
+	// only care about system-specific data
+	if ((cfg_type != config_type::SYSTEM) || !parentnode)
 		return;
 
-	/* might not have any data */
-	if (parentnode == nullptr)
-		return;
-
-	/* iterate over coins nodes */
-	for (coinnode = parentnode->get_child("coins"); coinnode; coinnode = coinnode->get_next_sibling("coins"))
+	// iterate over coins nodes
+	for (util::xml::data_node const *coinnode = parentnode->get_child("coins"); coinnode; coinnode = coinnode->get_next_sibling("coins"))
 	{
 		int index = coinnode->get_attribute_int("index", -1);
 		if (index >= 0 && index < COIN_COUNTERS)
 			m_coin_count[index] = coinnode->get_attribute_int("number", 0);
 	}
 
-	/* get the single tickets node */
-	ticketnode = parentnode->get_child("tickets");
-	if (ticketnode != nullptr)
+	// get the single tickets node
+	util::xml::data_node const *const ticketnode = parentnode->get_child("tickets");
+	if (ticketnode)
 		m_dispensed_tickets = ticketnode->get_attribute_int("number", 0);
 }
 
@@ -121,19 +129,17 @@ void bookkeeping_manager::config_load(config_type cfg_type, util::xml::data_node
 
 void bookkeeping_manager::config_save(config_type cfg_type, util::xml::data_node *parentnode)
 {
-	int i;
-
-	/* only care about game-specific data */
-	if (cfg_type != config_type::GAME)
+	// only save system-specific data
+	if (cfg_type != config_type::SYSTEM)
 		return;
 
-	/* iterate over coin counters */
-	for (i = 0; i < COIN_COUNTERS; i++)
+	// iterate over coin counters
+	for (int i = 0; i < COIN_COUNTERS; i++)
 	{
 		if (m_coin_count[i] != 0)
 		{
-			util::xml::data_node *coinnode = parentnode->add_child("coins", nullptr);
-			if (coinnode != nullptr)
+			util::xml::data_node *const coinnode = parentnode->add_child("coins", nullptr);
+			if (coinnode)
 			{
 				coinnode->set_attribute_int("index", i);
 				coinnode->set_attribute_int("number", m_coin_count[i]);
@@ -141,11 +147,11 @@ void bookkeeping_manager::config_save(config_type cfg_type, util::xml::data_node
 		}
 	}
 
-	/* output tickets */
+	// output tickets
 	if (m_dispensed_tickets != 0)
 	{
-		util::xml::data_node *tickets = parentnode->add_child("tickets", nullptr);
-		if (tickets != nullptr)
+		util::xml::data_node *const tickets = parentnode->add_child("tickets", nullptr);
+		if (tickets)
 			tickets->set_attribute_int("number", m_dispensed_tickets);
 	}
 }
@@ -157,11 +163,11 @@ void bookkeeping_manager::config_save(config_type cfg_type, util::xml::data_node
 
 void bookkeeping_manager::coin_counter_w(int num, int on)
 {
-	if (num >= ARRAY_LENGTH(m_coin_count))
+	if (num >= std::size(m_coin_count))
 		return;
 
-	/* Count it only if the data has changed from 0 to non-zero */
-	if (on && (m_lastcoin[num] == 0))
+	// count it only if the data has changed from 0 to non-zero
+	if (machine().time() > attotime::zero && on && (m_lastcoin[num] == 0))
 		m_coin_count[num]++;
 	m_lastcoin[num] = on;
 }
@@ -174,9 +180,22 @@ void bookkeeping_manager::coin_counter_w(int num, int on)
 
 int bookkeeping_manager::coin_counter_get_count(int num)
 {
-	if (num >= ARRAY_LENGTH(m_coin_count))
+	if (num >= std::size(m_coin_count))
 		return 0;
 	return m_coin_count[num];
+}
+
+
+/*-------------------------------------------------
+    coin_counter_reset_count - reset the coin count
+    for a given coin
+-------------------------------------------------*/
+
+void bookkeeping_manager::coin_counter_reset_count(int num)
+{
+	if (num >= std::size(m_coin_count))
+		return;
+	m_coin_count[num] = 0;
 }
 
 
@@ -184,9 +203,9 @@ int bookkeeping_manager::coin_counter_get_count(int num)
     coin_lockout_w - locks out one coin input
 -------------------------------------------------*/
 
-void bookkeeping_manager::coin_lockout_w(int num,int on)
+void bookkeeping_manager::coin_lockout_w(int num, int on)
 {
-	if (num >= ARRAY_LENGTH(m_coinlockedout))
+	if (num >= std::size(m_coinlockedout))
 		return;
 	m_coinlockedout[num] = on;
 }
@@ -199,7 +218,7 @@ void bookkeeping_manager::coin_lockout_w(int num,int on)
 
 int bookkeeping_manager::coin_lockout_get_state(int num)
 {
-	if (num >= ARRAY_LENGTH(m_coinlockedout))
+	if (num >= std::size(m_coinlockedout))
 		return false;
 	return m_coinlockedout[num];
 }
@@ -212,6 +231,6 @@ int bookkeeping_manager::coin_lockout_get_state(int num)
 
 void bookkeeping_manager::coin_lockout_global_w(int on)
 {
-	for (int i = 0; i < ARRAY_LENGTH(m_coinlockedout); i++)
+	for (int i = 0; i < std::size(m_coinlockedout); i++)
 		coin_lockout_w(i, on);
 }

@@ -27,7 +27,7 @@
 #include "machine/hdc92x4.h"
 #include "machine/ram.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 /*
     Implementation for modern floppy system.
@@ -37,32 +37,31 @@ class myarc_hfdc_device : public device_t, public device_ti99_peribox_card_inter
 public:
 	myarc_hfdc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
-	void readz(offs_t offset, uint8_t *value) override;
-	void write(offs_t offset, uint8_t data) override;
-	void setaddress_dbin(offs_t offset, int state) override;
-	void crureadz(offs_t offset, uint8_t *value) override;
-	void cruwrite(offs_t offset, uint8_t data) override;
+	virtual void readz(offs_t offset, uint8_t *value) override;
+	virtual void write(offs_t offset, uint8_t data) override;
+	virtual void setaddress_dbin(offs_t offset, int state) override;
+	virtual void crureadz(offs_t offset, uint8_t *value) override;
+	virtual void cruwrite(offs_t offset, uint8_t data) override;
 
 protected:
-	void device_config_complete() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
+
+	virtual const tiny_rom_entry *device_rom_region() const override ATTR_COLD;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
+	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
+
+	TIMER_CALLBACK_MEMBER(motor_off);
 
 private:
-	void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
-	void device_start() override;
-	void device_reset() override;
-
-	const tiny_rom_entry *device_rom_region() const override;
-	virtual void device_add_mconfig(machine_config &config) override;
-	ioport_constructor device_input_ports() const override;
-
-	DECLARE_WRITE_LINE_MEMBER( dmarq_w );
-	DECLARE_WRITE_LINE_MEMBER( intrq_w );
-	DECLARE_WRITE_LINE_MEMBER( dip_w );
+	void dmarq_w(int state);
+	void intrq_w(int state);
+	void dip_w(int state);
 	void auxbus_out(offs_t offset, uint8_t data);
 	uint8_t read_buffer();
 	void write_buffer(uint8_t data);
 
-	DECLARE_FLOPPY_FORMATS( floppy_formats );
+	static void floppy_formats(format_registration &fr);
 
 	// Debug accessors
 	void debug_read(offs_t offset, uint8_t* value);
@@ -100,16 +99,22 @@ private:
 	required_device<mm58274c_device> m_clock;
 
 	// Link to the attached floppy drives
-	floppy_image_device*    m_floppy_unit[4];
+	required_device_array<floppy_connector, 4> m_floppy;
 
 	// Link to the attached hard disks
-	mfm_harddisk_device*    m_harddisk_unit[3];
+	required_device_array<mfm_harddisk_connector, 3> m_harddisk;
 
 	// Currently selected floppy drive
 	floppy_image_device*    m_current_floppy;
 
 	// Currently selected hard drive
 	mfm_harddisk_device*    m_current_harddisk;
+
+	// Currently selected floppy disk index
+	int     m_current_floppy_index;
+
+	// Currently selected hard disk index
+	int     m_current_hd_index;
 
 	// True: Access to DIP switch settings, false: access to line states
 	bool    m_see_switches;
@@ -187,7 +192,7 @@ private:
 	int  m_readyflags;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_HFDC, bus::ti99::peb, myarc_hfdc_device)
 

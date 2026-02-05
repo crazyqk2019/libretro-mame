@@ -22,7 +22,7 @@
 
 #pragma once
 
-namespace bus { namespace ti99 { namespace joyport {
+namespace bus::ti99::joyport {
 
 enum
 {
@@ -76,15 +76,15 @@ public:
 	auto    int_cb() { return m_interrupt.bind(); }
 
 protected:
-	void device_start() override;
-	void device_config_complete() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_config_complete() override;
 
 private:
 	devcb_write_line           m_interrupt;
 	device_ti99_joyport_interface*    m_connected;
 };
 
-} } } // end namespace bus::ti99::joyport
+} // end namespace bus::ti99::joyport
 
 DECLARE_DEVICE_TYPE_NS(TI99_JOYPORT, bus::ti99::joyport, joyport_device)
 

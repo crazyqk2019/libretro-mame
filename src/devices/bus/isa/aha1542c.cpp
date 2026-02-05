@@ -99,6 +99,13 @@ Adaptec AHA-1540CF/1542CF Installation Guide
 http://download.adaptec.com/pdfs/installation_guides/aha1540cf_ig.pdf
  */
 
+/*
+Adaptec QFP ASICs
+— AHA-1540/42C: AIC-???? (covered by sticker)
+— AHA-1540/42CP: AIC-7970Q
+— AHA-1540/42CF: AIC-3370P, AIC-???? (covered by sticker)
+*/
+
 #include "emu.h"
 #include "aha1542c.h"
 #include "cpu/z80/z80.h"
@@ -141,7 +148,7 @@ http://download.adaptec.com/pdfs/installation_guides/aha1540cf_ig.pdf
 #define CMD_NOP         0x00    // No operation
 #define CMD_MBINIT      0x01    // mailbox initialization
 #define CMD_START_SCSI  0x02    // Start SCSI command
-#define CMD_BIOSCMD     0x03    // undocumented BIOS conmmand (shadow RAM etc.)
+#define CMD_BIOSCMD     0x03    // undocumented BIOS command (shadow RAM etc.)
 #define CMD_INQUIRY     0x04    // Adapter inquiry
 #define CMD_EMBOI       0x05    // enable Mailbox Out Interrupt
 #define CMD_SELTIMEOUT  0x06    // Set SEL timeout
@@ -225,7 +232,7 @@ void aha1542c_device::z84c0010_mem(address_map &map)
 {
 	map(0x0000, 0x7fff).rom().region(Z84C0010_TAG, 0);
 	map(0x8000, 0x9fff).ram();        // 2kb RAM chip
-	map(0xa000, 0xa000).portr("SWITCHES");
+	map(0xa000, 0xa000).portr(m_switches);
 	map(0xb000, 0xb000).w(FUNC(aha1542c_device::local_latch_w));
 	map(0xe000, 0xe0ff).ram();        // probably PC<->Z80 communication area
 	map(0xe003, 0xe003).lr8(NAME([] () { return 0x20; }));
@@ -248,7 +255,7 @@ void aha1542cp_device::local_mem(address_map &map)
 {
 	map(0x0000, 0x7fff).rom().region(Z84C0010_TAG, 0);
 	map(0x8000, 0x9fff).ram();
-	map(0xc000, 0xc000).portr("SWITCHES");
+	map(0xc000, 0xc000).portr(m_switches);
 	map(0xc001, 0xc001).rw(FUNC(aha1542cp_device::eeprom_r), FUNC(aha1542cp_device::eeprom_w));
 	map(0xe003, 0xe003).nopr();
 }
@@ -274,7 +281,7 @@ static INPUT_PORTS_START( aha1542c )
 	PORT_DIPSETTING(0x50, "D4000h")
 	PORT_DIPSETTING(0x60, "D8000h")
 	PORT_DIPSETTING(0x70, "DC000h")
-	PORT_BIT(0x80, IP_ACTIVE_HIGH, IPT_CUSTOM) PORT_READ_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, do_read)
+	PORT_BIT(0x80, IP_ACTIVE_HIGH, IPT_CUSTOM) PORT_READ_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::do_read))
 
 	PORT_START("FDC_CONFIG")
 	PORT_DIPNAME(0x1, 0x1, "Floppy Disk Controller") PORT_DIPLOCATION("S1:5")
@@ -355,6 +362,7 @@ aha1542c_device::aha1542c_device(const machine_config &mconfig, device_type type
 	: device_t(mconfig, type, tag, owner, clock)
 	, device_isa16_card_interface(mconfig, *this)
 	, m_eeprom(*this, "eeprom")
+	, m_switches(*this, "SWITCHES")
 {
 }
 
@@ -376,7 +384,7 @@ aha1542cp_device::aha1542cp_device(const machine_config &mconfig, const char *ta
 void aha1542c_device::device_start()
 {
 	set_isa_device();
-	m_isa->install_rom(this, 0xdc000, 0xdffff, "aha1542", "aha1542");
+	m_isa->install_rom(this, 0xdc000, 0xdffff, "aha1542");
 	m_isa->install_device(0x330, 0x333,
 			read8sm_delegate(*this, FUNC(aha1542cf_device::aha1542_r)),
 			write8sm_delegate(*this, FUNC(aha1542cf_device::aha1542_w)));

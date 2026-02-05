@@ -68,7 +68,7 @@ public:
 	auto write_port5_callback() { return m_write_port[4].bind(); }
 	auto write_port6_callback() { return m_write_port[5].bind(); }
 	auto write_port7_callback() { return m_write_port[6].bind(); }
-	tms1024_device &set_ms(u8 i) { m_ms = i & 1; return *this; } // if hardwired, can just set MS pin state here
+	tms1024_device &set_ms(int state) { m_ms = state ? 1 : 0; return *this; } // if hardwired, can just set MS pin state here
 
 	void write_h(u8 data);
 	u8 read_h();
@@ -80,7 +80,7 @@ protected:
 	tms1024_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock);
 
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 	u8 m_h;      // 4-bit data latch
 	u8 m_s;      // 3-bit port select

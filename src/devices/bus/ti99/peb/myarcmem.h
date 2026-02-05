@@ -18,7 +18,7 @@
 #include "peribox.h"
 #include "machine/ram.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 class myarc_memory_expansion_device : public device_t, public device_ti99_peribox_card_interface
 {
@@ -31,11 +31,11 @@ public:
 	void cruwrite(offs_t offset, uint8_t data) override;
 
 protected:
-	void device_start() override;
-	void device_reset() override;
+	void device_start() override ATTR_COLD;
+	void device_reset() override ATTR_COLD;
 	const tiny_rom_entry *device_rom_region() const override;
 	ioport_constructor device_input_ports() const override;
-	virtual void device_add_mconfig(machine_config &config) override;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
 
 private:
 	int     get_base(int offset);
@@ -45,7 +45,7 @@ private:
 	int     m_size;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_MYARCMEM, bus::ti99::peb, myarc_memory_expansion_device)
 

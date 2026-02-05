@@ -83,7 +83,7 @@ void c64_magic_formel_cartridge_device::pia_pb_w(uint8_t data)
 	m_pb7 = BIT(data, 7);
 }
 
-WRITE_LINE_MEMBER( c64_magic_formel_cartridge_device::pia_cb2_w )
+void c64_magic_formel_cartridge_device::pia_cb2_w(int state)
 {
 	if (!state)
 	{
@@ -98,7 +98,7 @@ WRITE_LINE_MEMBER( c64_magic_formel_cartridge_device::pia_cb2_w )
 
 void c64_magic_formel_cartridge_device::device_add_mconfig(machine_config &config)
 {
-	PIA6821(config, m_pia, 0);
+	PIA6821(config, m_pia);
 	m_pia->writepa_handler().set(FUNC(c64_magic_formel_cartridge_device::pia_pa_w));
 	m_pia->writepb_handler().set(FUNC(c64_magic_formel_cartridge_device::pia_pb_w));
 	m_pia->cb2_handler().set(FUNC(c64_magic_formel_cartridge_device::pia_cb2_w));
@@ -130,7 +130,7 @@ INPUT_CHANGED_MEMBER( c64_magic_formel_cartridge_device::freeze )
 
 static INPUT_PORTS_START( c64_magic_formel )
 	PORT_START("FREEZE")
-	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Freeze") PORT_CODE(KEYCODE_F12) PORT_CHANGED_MEMBER(DEVICE_SELF, c64_magic_formel_cartridge_device, freeze, 0)
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Freeze") PORT_CODE(KEYCODE_F12) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(c64_magic_formel_cartridge_device::freeze), 0)
 INPUT_PORTS_END
 
 
@@ -157,7 +157,7 @@ c64_magic_formel_cartridge_device::c64_magic_formel_cartridge_device(const machi
 	device_t(mconfig, C64_MAGIC_FORMEL, tag, owner, clock),
 	device_c64_expansion_card_interface(mconfig, *this),
 	m_pia(*this, MC6821_TAG),
-	m_ram(*this, "ram"),
+	m_ram(*this, "ram", 0x2000, ENDIANNESS_LITTLE),
 	m_rom_bank(0),
 	m_ram_bank(0),
 	m_ram_oe(0),
@@ -174,9 +174,6 @@ c64_magic_formel_cartridge_device::c64_magic_formel_cartridge_device(const machi
 
 void c64_magic_formel_cartridge_device::device_start()
 {
-	// allocate memory
-	m_ram.allocate(0x2000);
-
 	// state saving
 	save_item(NAME(m_rom_bank));
 	save_item(NAME(m_ram_bank));

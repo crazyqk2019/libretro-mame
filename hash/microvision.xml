@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE softwarelist SYSTEM "softwarelist.dtd">
 <!--
-license:CC0
+license:CC0-1.0
 -->
 
 <!--
@@ -27,6 +27,7 @@ The "clock" feature is used to indicate MCU clock frequency
 The "pla" feature is for TMS1100 output PLA type
 The "paddle" feature is used to indicate if paddle circuitry exists on the PCB
 The "butmask" feature indicates cartridge button restrict mask (active-low)
+
 -->
 
 <softwarelist name="microvision" description="Milton Bradley Microvision cartridges">
@@ -257,7 +258,7 @@ The "butmask" feature indicates cartridge button restrict mask (active-low)
 	<software name="microbrd">
 		<description>MicroBird</description>
 		<year>2018</year>
-		<publisher>Ayza</publisher>
+		<publisher>azya</publisher>
 		<part name="cart" interface="microvision_cart">
 			<feature name="clock" value="3000000" />
 			<feature name="paddle" value="0" />
@@ -270,7 +271,7 @@ The "butmask" feature indicates cartridge button restrict mask (active-low)
 	<software name="tetris">
 		<description>Tetris (TMS1100 version)</description>
 		<year>2019</year>
-		<publisher>Ayza</publisher>
+		<publisher>azya</publisher>
 		<part name="cart" interface="microvision_cart">
 			<feature name="clock" value="500000" />
 			<feature name="pla" value="1" />
@@ -284,7 +285,7 @@ The "butmask" feature indicates cartridge button restrict mask (active-low)
 	<software name="tetriso" cloneof="tetris">
 		<description>Tetris (8021 version)</description>
 		<year>2018</year>
-		<publisher>Ayza</publisher>
+		<publisher>azya</publisher>
 		<part name="cart" interface="microvision_cart">
 			<feature name="clock" value="3000000" />
 			<feature name="paddle" value="0" />

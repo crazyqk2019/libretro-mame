@@ -27,8 +27,8 @@ device_neogeo_cart_interface::device_neogeo_cart_interface(const machine_config 
 	m_region_audio(*this, "^audiocpu"),
 	m_region_audiocrypt(*this, "^audiocrypt"),
 	m_region_spr(*this, "^sprites"),
-	m_region_ym(*this, "^ymsnd"),
-	m_region_ymd(*this, "^ymsnd.deltat")
+	m_region_ym(*this, "^ymsnd:adpcma"),
+	m_region_ymd(*this, "^ymsnd:adpcmb")
 {
 }
 
@@ -99,7 +99,7 @@ void device_neogeo_cart_interface::optimize_sprites(uint8_t* region_sprites, uin
 //-------------------------------------------------
 neogeo_cart_slot_device::neogeo_cart_slot_device(const machine_config &mconfig, const char *tag, device_t *owner, uint16_t clock) :
 	device_t(mconfig, NEOGEO_CART_SLOT, tag, owner, clock),
-	device_image_interface(mconfig, *this),
+	device_cartrom_image_interface(mconfig, *this),
 	device_single_card_slot_interface<device_neogeo_cart_interface>(mconfig, *this),
 	m_cart(nullptr)
 {
@@ -207,7 +207,7 @@ static int neogeo_get_pcb_id(const char *slot)
 {
 	for (auto & elem : slot_list)
 	{
-		if (!core_stricmp(elem.slot_option, slot))
+		if (!strcmp(elem.slot_option, slot))
 			return elem.pcb_id;
 	}
 
@@ -224,8 +224,7 @@ void neogeo_cart_slot_device::set_cart_type(const char *slot)
  call load
  -------------------------------------------------*/
 
-
-image_init_result neogeo_cart_slot_device::call_load()
+std::pair<std::error_condition, std::string> neogeo_cart_slot_device::call_load()
 {
 	if (m_cart)
 	{
@@ -259,17 +258,17 @@ image_init_result neogeo_cart_slot_device::call_load()
 				memcpy(ROM8 + 0x10000, get_software_region("audiocpu"), len); // avoid reloading in XML, should just improve banking instead tho?
 			}
 
-			len = get_software_region_length("ymsnd");
+			len = get_software_region_length("ymsnd:adpcma");
 			m_cart->ym_alloc(len);
 			ROM8 = m_cart->get_ym_base();
-			memcpy(ROM8, get_software_region("ymsnd"), len);
+			memcpy(ROM8, get_software_region("ymsnd:adpcma"), len);
 
-			if (get_software_region("ymsnd.deltat") != nullptr)
+			if (get_software_region("ymsnd:adpcmb") != nullptr)
 			{
-				len = get_software_region_length("ymsnd.deltat");
+				len = get_software_region_length("ymsnd:adpcmb");
 				m_cart->ymdelta_alloc(len);
 				ROM8 = m_cart->get_ymdelta_base();
-				memcpy(ROM8, get_software_region("ymsnd.deltat"), len);
+				memcpy(ROM8, get_software_region("ymsnd:adpcmb"), len);
 			}
 			else
 			{
@@ -304,12 +303,10 @@ image_init_result neogeo_cart_slot_device::call_load()
 			// SPEED UP WORKAROUND: to speed up sprite drawing routine, let us store the sprite data in
 			// a different format (we then always access such alt format for drawing)
 			m_cart->optimize_sprites(m_cart->get_sprites_base(), m_cart->get_sprites_size());
-
-			return image_init_result::PASS;
 		}
 	}
 
-	return image_init_result::PASS;
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 

@@ -7,7 +7,7 @@
  * 4-Digit 16-Segment Alphanumeric Intelligent Display
  * with Memory/Decoder/Driver
  *
- * See video/dl1416.c for more info
+ * See video/dl1416.cpp for more info
  *
  ****************************************************************************/
 
@@ -33,11 +33,12 @@ DECLARE_DEVICE_TYPE(DL1416T, dl1416_device)
 class dl1414_device : public device_t
 {
 public:
+	virtual ~dl1414_device();
+
 	auto update() { return m_update_cb.bind(); }
 
 	// signal-level interface
-	DECLARE_WRITE_LINE_MEMBER(wr_w); // write strobe (rising edge)
-	DECLARE_WRITE_LINE_MEMBER(ce_w); // chip enable (active low)
+	virtual void wr_w(int state); // write strobe (rising edge)
 	void addr_w(u8 state);
 	void data_w(u8 state);
 
@@ -52,31 +53,36 @@ protected:
 			device_t *owner,
 			u32 clock);
 
-	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	// device_t implementation
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	void set_cursor_state(offs_t offset, bool state);
 	virtual u16 translate(u8 digit, bool cursor) const = 0;
 
+	// input line state
+	bool m_wr_in;
+	u8 m_addr_in;
+	u8 m_data_in;
+
 private:
 	devcb_write16 m_update_cb;
+
+	void do_update(offs_t offset);
 
 	// internal state
 	u8 m_digit_ram[4]; // holds the digit code for each position
 	bool m_cursor_state[4]; // holds the cursor state for each position
-
-	// input line state
-	bool m_wr_in;
-	bool m_ce_in, m_ce_latch;
-	u8 m_addr_in, m_addr_latch;
-	u8 m_data_in;
 };
 
 class dl1416_device : public dl1414_device
 {
 public:
-	DECLARE_WRITE_LINE_MEMBER(cu_w); // cursor enable (active low)
+	virtual ~dl1416_device();
+
+	virtual void wr_w(int state) override;
+	void ce_w(int state); // chip enable (active low)
+	void cu_w(int state); // cursor enable (active low)
 
 protected:
 	dl1416_device(
@@ -87,13 +93,15 @@ protected:
 			u32 clock);
 
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 	bool cu_in() const { return m_cu_in; }
 
 private:
 	// input line state
+	bool m_ce_in, m_ce_latch;
 	bool m_cu_in;
+	u8 m_addr_latch;
 };
 
 #endif // MAME_VIDEO_DL1416_H

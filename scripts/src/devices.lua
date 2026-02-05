@@ -33,7 +33,6 @@ function devicesProject(_target, _subtarget)
 		MAME_DIR .. "src/osd",
 		MAME_DIR .. "src/emu",
 		MAME_DIR .. "src/devices",
-		MAME_DIR .. "src/mame", -- used for sound amiga
 		MAME_DIR .. "src/lib",
 		MAME_DIR .. "src/lib/util",
 		MAME_DIR .. "3rdparty",
@@ -49,6 +48,10 @@ function devicesProject(_target, _subtarget)
 	dofile(path.join("src", "sound.lua"))
 
 	dofile(path.join("src", "video.lua"))
+
+if _OPTIONS["osd"]=="retro" then
+    dofile(path.join("src", "video_retro.lua"))
+end
 
 	dofile(path.join("src", "machine.lua"))
 

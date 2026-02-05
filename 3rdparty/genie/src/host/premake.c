@@ -106,6 +106,11 @@ int premake_execute(lua_State* L, int argc, const char** argv)
 {
 	/* Parse the command line arguments */
 	int z = process_arguments(L, argc, argv);
+	const char* env = getenv("PREMAKE");
+
+	/* Skip doing the scripts every single time */
+	if (env && !strcmp(env, "0"))
+		return z;
 
 	/* Run the built-in Premake scripts */
 	if (z == OKAY)  z = load_builtin_scripts(L);
@@ -129,6 +134,8 @@ int premake_locate(lua_State* L, const char* argv0)
 
 	char buffer[PATH_MAX];
 	const char* path = NULL;
+
+	memset(buffer, 0, PATH_MAX);
 
 #if PLATFORM_WINDOWS
 	DWORD len = GetModuleFileName(NULL, buffer, PATH_MAX);

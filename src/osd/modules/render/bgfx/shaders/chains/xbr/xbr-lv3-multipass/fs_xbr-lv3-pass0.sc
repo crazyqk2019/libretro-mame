@@ -5,7 +5,7 @@ $input v_texcoord0, v_texcoord1, v_texcoord2, v_texcoord3, v_texcoord4, v_texcoo
 
 /*
    Hyllian's xBR level 3 pass0 Shader
-   
+
    Copyright (C) 2011-2015 Hyllian - sergiogdb@gmail.com
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -120,7 +120,7 @@ vec4 weighted_distance(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, v
 		LEFT = UP = LEFT3 = UP3 = 0.0;		\
 		PX0  = vec2(0.0, PX);				\
 		LIN0 = vec4(0.0, 0.0, 0.0, 0.0);	\
-	}										\
+	}
 
 
 

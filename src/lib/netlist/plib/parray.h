@@ -1,4 +1,4 @@
-// license:GPL-2.0+
+// license:BSD-3-Clause
 // copyright-holders:Couriersud
 
 #ifndef PARRAY_H_
@@ -11,10 +11,11 @@
 #include "palloc.h"
 #include "pconfig.h"
 #include "pexception.h"
-#include "pstrutil.h"
+#include "pfmtlog.h"
 
 #include <array>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -22,14 +23,14 @@
 namespace plib {
 
 	template <typename FT, int SIZE, typename ARENA>
-	struct sizeabs
+	struct parray_traits
 	{
 		static constexpr std::size_t ABS() noexcept { return (SIZE < 0) ? narrow_cast<std::size_t>(0 - SIZE) : narrow_cast<std::size_t>(SIZE); }
 		using container = typename std::array<FT, ABS()> ;
 	};
 
 	template <typename FT, typename ARENA>
-	struct sizeabs<FT, 0, ARENA>
+	struct parray_traits<FT, 0, ARENA>
 	{
 		static constexpr std::size_t ABS() noexcept { return 0; }
 		using allocator_type = typename ARENA::template allocator_type<FT, PALIGN_VECTOROPT>;
@@ -52,13 +53,13 @@ namespace plib {
 	/// I consider > 10% performance difference to be a use case.
 	///
 
-	template <typename FT, int SIZE, typename ARENA = aligned_arena>
+	template <typename FT, int SIZE, typename ARENA = aligned_arena<>>
 	struct parray
 	{
 	public:
-		static constexpr std::size_t SIZEABS() noexcept { return sizeabs<FT, SIZE, ARENA>::ABS(); }
+		static constexpr std::size_t SIZEABS() noexcept { return parray_traits<FT, SIZE, ARENA>::ABS(); }
 
-		using base_type = typename sizeabs<FT, SIZE, ARENA>::container;
+		using base_type = typename parray_traits<FT, SIZE, ARENA>::container;
 		using size_type = typename base_type::size_type;
 		using value_type = FT;
 		using reference =  FT &;
@@ -85,7 +86,7 @@ namespace plib {
 		{
 			if ((SIZE < 0 && size > SIZEABS())
 				|| (SIZE > 0 && size != SIZEABS()))
-				throw pexception("parray: size error " + plib::to_string(size) + ">" + plib::to_string(SIZE));
+				throw pexception(pfmt("parray: size error: {1} > {2}")(size, SIZE));
 		}
 
 		template <int X = SIZE >
@@ -94,7 +95,7 @@ namespace plib {
 		{
 			if ((SIZE < 0 && size > SIZEABS())
 				|| (SIZE > 0 && size != SIZEABS()))
-				throw pexception("parray: size error " + plib::to_string(size) + ">" + plib::to_string(SIZE));
+				throw pexception(pfmt("parray: size error: {1} > {2}")(size, SIZE));
 			m_a.fill(val);
 		}
 
@@ -105,12 +106,9 @@ namespace plib {
 		{
 		}
 
-		// osx clang doesn't like COPYASSIGNMOVE(parray, default)
-		// it will generate some weird error messages about move assignment
-		// constructor having a different noexcept status.
-
 		parray(const parray &rhs) : m_a(rhs.m_a), m_size(rhs.m_size) {}
 		parray(parray &&rhs) noexcept : m_a(std::move(rhs.m_a)), m_size(std::move(rhs.m_size)) {}
+
 		parray &operator=(const parray &rhs) noexcept // NOLINT(bugprone-unhandled-self-assignment, cert-oop54-cpp)
 		{
 			if (this == &rhs)
@@ -125,25 +123,25 @@ namespace plib {
 
 		~parray() noexcept = default;
 
-		base_type &as_base() noexcept { return m_a; }
+		constexpr base_type &as_base() noexcept { return m_a; }
 
-		inline size_type size() const noexcept { return SIZE <= 0 ? m_size : SIZEABS(); }
+		constexpr size_type size() const noexcept { return SIZE <= 0 ? m_size : SIZEABS(); }
 
 		constexpr size_type max_size() const noexcept { return base_type::max_size(); }
 
-		bool empty() const noexcept { return size() == 0; }
+		constexpr bool empty() const noexcept { return size() == 0; }
 
 		constexpr reference operator[](size_type i) noexcept
 		{
-			return data()[i];
+			return m_a[i];
 		}
 		constexpr const_reference operator[](size_type i) const noexcept
 		{
-			return data()[i];
+			return m_a[i];
 		}
 
-		pointer data() noexcept { return m_a.data(); }
-		const_pointer data() const noexcept { return m_a.data(); }
+		constexpr pointer data() noexcept { return m_a.data(); }
+		constexpr const_pointer data() const noexcept { return m_a.data(); }
 
 	private:
 		PALIGNAS_VECTOROPT()
@@ -157,6 +155,7 @@ namespace plib {
 	public:
 
 		using size_type = std::size_t;
+		using base_type = parray<parray<FT, SIZE2>, SIZE1>;
 
 		parray2D(size_type size1, size_type size2)
 		: parray<parray<FT, SIZE2>, SIZE1>(size1)
@@ -168,7 +167,10 @@ namespace plib {
 			}
 		}
 
-		PCOPYASSIGNMOVE(parray2D, default)
+		parray2D(const parray2D &) = default;
+		parray2D &operator=(const parray2D &) = default;
+		parray2D(parray2D &&) noexcept(std::is_nothrow_move_constructible<base_type>::value) = default;
+		parray2D &operator=(parray2D &&) noexcept(std::is_nothrow_move_assignable<base_type>::value) = default;
 
 		~parray2D() noexcept = default;
 

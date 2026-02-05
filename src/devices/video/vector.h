@@ -16,6 +16,7 @@ public:
 	static float s_flicker;
 	static float s_beam_width_min;
 	static float s_beam_width_max;
+	static float s_beam_dot_size;
 	static float s_beam_intensity_weight;
 
 protected:
@@ -38,7 +39,7 @@ public:
 	void add_point(int x, int y, rgb_t color, int intensity);
 
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 private:
 	/* The vertices are buffered here */

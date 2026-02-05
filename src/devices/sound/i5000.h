@@ -30,10 +30,10 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
-	virtual void sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples) override;
+	virtual void sound_stream_update(sound_stream &stream) override;
 
 	sound_stream *m_stream;
 
@@ -55,7 +55,6 @@ private:
 		int vol_l;
 		int output_r;
 		int output_l;
-
 	};
 
 	channel_t m_channels[16];

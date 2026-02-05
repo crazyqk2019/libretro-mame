@@ -1,5 +1,5 @@
 // license:BSD-3-Clause
-// copyright-holders:Nicola Salmoria
+// copyright-holders:Nicola Salmoria, Hiromitsu Shioya
 /*********************************************************/
 /*    Konami PCM controller                              */
 /*********************************************************/
@@ -9,15 +9,15 @@
 
 #pragma once
 
-class k007232_device : public device_t, public device_sound_interface
+class k007232_device : public device_t, public device_sound_interface, public device_memory_interface
 {
 public:
-	k007232_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	k007232_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
 	auto port_write() { return m_port_write_handler.bind(); }
 
-	void write(offs_t offset, uint8_t data);
-	uint8_t read(offs_t offset);
+	void write(offs_t offset, u8 data);
+	u8 read(offs_t offset);
 
 	/*
 	The 007232 has two channels and produces two outputs. The volume control
@@ -27,41 +27,50 @@ public:
 	then volumeB will be 0 for channel 0, and volumeA will be 0 for channel 1.
 	Volume is in the range 0-255.
 	*/
-	void set_volume(int channel,int volumeA,int volumeB);
+	void set_volume(int channel, int vol_a, int vol_b);
 
-	void set_bank( int chABank, int chBBank );
+	void set_bank(int chan_a_bank, int chan_b_bank);
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_clock_changed() override;
 
 	// sound stream update overrides
-	virtual void sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples) override;
+	virtual void sound_stream_update(sound_stream &stream) override;
 
-	void make_fncodes();
+	// device_memory_interface configuration
+	virtual space_config_vector memory_space_config() const override;
+
+	address_space_config m_data_config;
 
 private:
-	uint32_t get_start_address(int channel);
-
-	static constexpr unsigned KDAC_A_PCM_MAX = 2;      /* Channels per chip */
-
 	// internal state
-	required_region_ptr<uint8_t> m_rom;
+	memory_access<17, 0, 0, ENDIANNESS_LITTLE>::cache m_cache;
+	optional_region_ptr<u8> m_rom;
 
-	uint8_t           m_vol[KDAC_A_PCM_MAX][2]; /* volume for the left and right channel */
-	uint32_t          m_addr[KDAC_A_PCM_MAX];
-	uint32_t          m_start[KDAC_A_PCM_MAX];
-	uint32_t          m_step[KDAC_A_PCM_MAX];
-	uint32_t          m_bank[KDAC_A_PCM_MAX];
-	int               m_play[KDAC_A_PCM_MAX];
+	struct channel_t
+	{
+		u8           vol[2]; // volume for the left and right channel
+		u32          addr;
+		int          counter;
+		u32          start;
+		u16          step;
+		u32          bank;
+		bool         play;
+	};
 
-	uint8_t           m_wreg[0x10]; /* write data */
+	u8 read_rom_default(offs_t offset) { return m_rom[(m_bank + (offset & 0x1ffff)) & (m_rom.length() - 1)]; }
+	inline u8 read_sample(int channel, u32 addr) { m_bank = m_channel[channel].bank; return m_cache.read_byte(addr & 0x1ffff); }
+	void start(int ch);
 
-	uint32_t          m_pcmlimit;
+	channel_t     m_channel[2]; // 2 channels
+	u8            m_wreg[0x10]; // write data
+	u32           m_pcmlimit;
+	u32           m_bank;
 
-	sound_stream *    m_stream;
-	uint32_t          m_fncode[0x200];
-	devcb_write8      m_port_write_handler;
+	sound_stream *m_stream;
+	devcb_write8  m_port_write_handler;
 };
 
 DECLARE_DEVICE_TYPE(K007232, k007232_device)

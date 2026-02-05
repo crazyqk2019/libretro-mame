@@ -13,7 +13,7 @@
 //  DEVICE DEFINITIONS
 //**************************************************************************
 
-DEFINE_DEVICE_TYPE(SPECTRUM_USLOT, spectrum_uslot_device, "spectrum_uslot", "Spectrum Currah \xC2\xB5Slot")
+DEFINE_DEVICE_TYPE(SPECTRUM_USLOT, spectrum_uslot_device, "spectrum_uslot", u8"Spectrum Currah µSlot")
 
 
 //-------------------------------------------------
@@ -71,15 +71,33 @@ void spectrum_uslot_device::device_reset()
 //  IMPLEMENTATION
 //**************************************************************************
 
-READ_LINE_MEMBER(spectrum_uslot_device::romcs)
+bool spectrum_uslot_device::romcs()
 {
-	return m_exp1->romcs() | m_exp2->romcs();
+	return m_exp1->romcs() || m_exp2->romcs();
 }
 
 void spectrum_uslot_device::pre_opcode_fetch(offs_t offset)
 {
 	m_exp1->pre_opcode_fetch(offset);
 	m_exp2->pre_opcode_fetch(offset);
+}
+
+void spectrum_uslot_device::post_opcode_fetch(offs_t offset)
+{
+	m_exp1->post_opcode_fetch(offset);
+	m_exp2->post_opcode_fetch(offset);
+}
+
+void spectrum_uslot_device::pre_data_fetch(offs_t offset)
+{
+	m_exp1->pre_data_fetch(offset);
+	m_exp2->pre_data_fetch(offset);
+}
+
+void spectrum_uslot_device::post_data_fetch(offs_t offset)
+{
+	m_exp1->post_data_fetch(offset);
+	m_exp2->post_data_fetch(offset);
 }
 
 uint8_t spectrum_uslot_device::mreq_r(offs_t offset)

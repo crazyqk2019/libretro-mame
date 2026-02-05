@@ -2,17 +2,17 @@
 // copyright-holders:Olivier Galibert, R. Belmont, MetalliC
 /***************************************************************************
 
-    Yamaha YMZ770C "AMMS-A" and YMZ774 "AMMS2C"
+    Yamaha YMZ770B "AMMSL", YMZ770C "AMMS-A" and YMZ774 "AMMS2C"
 
     Emulation by R. Belmont and MetalliC
     AMM decode by Olivier Galibert
 
 -----
 TODO:
-- What does channel ATBL mean?
 - Simple Access mode. SACs is register / data lists same as SEQ. in 770C, when both /SEL and /CS pins goes low - will be run SAC with number set at data bus.
   can not be used in CV1K (/SEL pin is NC, internally pulled to VCC), probably not used in PGM2 too.
  770:
+- Configurable clock (currently hardcoded at 16kHz)
 - sequencer timers implemented but seems unused, presumably because of design flaws or bugs, likely due to lack of automatic adding of sequencer # to register offset.
   in result sequences uses very long chains of 32-sample wait commands instead, wasting a lot of ROM space.
 - sequencer triggers not implemented, not sure how they works (Deathsmiles ending tune starts sequence with TGST = 01h, likely a bug and don't affect tune playback)
@@ -23,7 +23,7 @@ TODO:
 - sequencer off trigger (not used in games)
 
  known SPUs in this series:
-  YMZ770B  AMMSL    Capcom medal hardware (alien.cpp), sample format is not AMM, in other parts looks like 770C
+  YMZ770B  AMMSL    Capcom medal hardware (alien.cpp)
   YMZ770C  AMMS-A   Cave CV1000
   YMZ771   SSGS3
   YMZ773   AMMS2    Cron corp. video slots
@@ -77,7 +77,7 @@ ymz770_device::ymz770_device(const machine_config &mconfig, device_type type, co
 void ymz770_device::device_start()
 {
 	// create the stream
-	m_stream = machine().sound().stream_alloc(*this, 0, 2, m_sclock);
+	m_stream = stream_alloc(0, 2, m_sclock);
 
 	for (auto & channel : m_channels)
 	{
@@ -182,14 +182,9 @@ void ymz770_device::device_reset()
 //  our sound stream
 //-------------------------------------------------
 
-void ymz770_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void ymz770_device::sound_stream_update(sound_stream &stream)
 {
-	stream_sample_t *outL, *outR;
-
-	outL = outputs[0];
-	outR = outputs[1];
-
-	for (int i = 0; i < samples; i++)
+	for (int i = 0; i < stream.samples(); i++)
 	{
 		sequencer();
 
@@ -238,7 +233,7 @@ retry:
 				{
 					// next block
 					int sample_rate, channel_count;
-					if (!channel.decoder->decode_buffer(channel.pptr, m_rom.bytes()*8, channel.output_data, channel.output_remaining, sample_rate, channel_count) || channel.output_remaining == 0)
+					if (!channel.decoder->decode_buffer(channel.pptr, m_rom.bytes()*8, channel.output_data, channel.output_remaining, sample_rate, channel_count, channel.atbl) || channel.output_remaining == 0)
 					{
 						channel.is_playing = !channel.last_block; // detect infinite retry loop
 						channel.last_block = true;
@@ -268,22 +263,22 @@ retry:
 		switch (m_cpl)
 		{
 		case 3:
-			mixl = (mixl > ClipMax3) ? ClipMax3 : (mixl < -ClipMax3) ? -ClipMax3 : mixl;
-			mixr = (mixr > ClipMax3) ? ClipMax3 : (mixr < -ClipMax3) ? -ClipMax3 : mixr;
+			mixl = std::clamp(mixl, -ClipMax3, ClipMax3);
+			mixr = std::clamp(mixr, -ClipMax3, ClipMax3);
 			break;
 		case 2:
-			mixl = (mixl > ClipMax2) ? ClipMax2 : (mixl < -ClipMax2) ? -ClipMax2 : mixl;
-			mixr = (mixr > ClipMax2) ? ClipMax2 : (mixr < -ClipMax2) ? -ClipMax2 : mixr;
+			mixl = std::clamp(mixl, -ClipMax2, ClipMax2);
+			mixr = std::clamp(mixr, -ClipMax2, ClipMax2);
 			break;
 		case 1:
-			mixl = (mixl > 32767) ? 32767 : (mixl < -32768) ? -32768 : mixl;
-			mixr = (mixr > 32767) ? 32767 : (mixr < -32768) ? -32768 : mixr;
+			mixl = std::clamp(mixl, -32768, 32767);
+			mixr = std::clamp(mixr, -32768, 32767);
 			break;
 		}
 		if (m_mute)
 			mixr = mixl = 0;
-		outL[i] = mixl;
-		outR[i] = mixr;
+		stream.put_int(0, i, mixl, 32768);
+		stream.put_int(1, i, mixr, 32768);
 	}
 }
 

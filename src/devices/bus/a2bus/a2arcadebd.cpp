@@ -15,8 +15,14 @@
 
 #include "emu.h"
 #include "a2arcadebd.h"
+
+#include "video/tms9928a.h"
+#include "sound/ay8910.h"
+
 #include "speaker.h"
 
+
+namespace {
 
 /***************************************************************************
     PARAMETERS
@@ -27,10 +33,35 @@
 #define SCREEN_TAG "screen"
 
 //**************************************************************************
-//  GLOBAL VARIABLES
+//  TYPE DEFINITIONS
 //**************************************************************************
 
-DEFINE_DEVICE_TYPE(A2BUS_ARCADEBOARD, a2bus_arcboard_device, "a2arcbd", "Third Millenium Engineering Arcade Board")
+class a2bus_arcboard_device:
+	public device_t,
+	public device_a2bus_card_interface
+{
+public:
+	// construction/destruction
+	a2bus_arcboard_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+
+protected:
+	a2bus_arcboard_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
+
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
+
+	// overrides of standard a2bus slot functions
+	virtual uint8_t read_c0nx(uint8_t offset) override;
+	virtual void write_c0nx(uint8_t offset, uint8_t data) override;
+	virtual void reset_from_bus() override;
+
+private:
+	void tms_irq_w(int state);
+
+	required_device<tms9918a_device> m_tms;
+	required_device<ay8910_device> m_ay;
+};
 
 //-------------------------------------------------
 //  device_add_mconfig - add device configuration
@@ -74,6 +105,12 @@ void a2bus_arcboard_device::device_start()
 
 void a2bus_arcboard_device::device_reset()
 {
+}
+
+void a2bus_arcboard_device::reset_from_bus()
+{
+	m_tms->reset();
+	m_ay->reset();
 }
 
 /*
@@ -127,7 +164,7 @@ void a2bus_arcboard_device::write_c0nx(uint8_t offset, uint8_t data)
 	}
 }
 
-WRITE_LINE_MEMBER( a2bus_arcboard_device::tms_irq_w )
+void a2bus_arcboard_device::tms_irq_w(int state)
 {
 	if (state)
 	{
@@ -138,3 +175,12 @@ WRITE_LINE_MEMBER( a2bus_arcboard_device::tms_irq_w )
 		lower_slot_irq();
 	}
 }
+
+} // anonymous namespace
+
+
+//**************************************************************************
+//  GLOBAL VARIABLES
+//**************************************************************************
+
+DEFINE_DEVICE_TYPE_PRIVATE(A2BUS_ARCADEBOARD, device_a2bus_card_interface, a2bus_arcboard_device, "a2arcbd", "Third Millenium Engineering Arcade Board")

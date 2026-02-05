@@ -306,17 +306,18 @@ uint8_t sed1330_device::data_r()
 	case INSTRUCTION_CSRR:
 		switch (m_pbc)
 		{
-		case 0:
-			data = m_csr & 0xff;
-			break;
+			case 0:
+				data = m_csr & 0xff;
+				break;
 
-		case 1:
-			data = (m_csr & 0xff00) >> 8;
-			break;
+			case 1:
+				data = (m_csr & 0xff00) >> 8;
+				break;
 
-		default:
-			logerror("SED1330 Invalid parameter byte %02x\n", data);
+			default:
+				logerror("SED1330 Invalid parameter byte %02x\n", data);
 		}
+
 		if (!machine().side_effects_disabled())
 		{
 			LOG("SED1330 Cursor Byte %d Read %02x\n", m_pbc, data);
@@ -605,7 +606,7 @@ void sed1330_device::data_w(uint8_t data)
 
 void sed1330_device::draw_text_scanline(bitmap_ind16 &bitmap, const rectangle &cliprect, int y, int r, uint16_t va, bool cursor)
 {
-	uint16_t *p = &bitmap.pix16(y, 0);
+	uint16_t *p = &bitmap.pix(y);
 
 	for (int sx = 0; sx < m_cr; sx++, p += m_fx)
 	{
@@ -653,7 +654,7 @@ void sed1330_device::draw_graphics_scanline(bitmap_ind16 &bitmap, const rectangl
 
 		for (int x = 0; x < m_fx; x++)
 		{
-			bitmap.pix16(y, (sx * m_fx) + x) = BIT(data, 7);
+			bitmap.pix(y, (sx * m_fx) + x) = BIT(data, 7);
 			data <<= 1;
 		}
 	}

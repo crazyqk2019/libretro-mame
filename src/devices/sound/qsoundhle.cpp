@@ -15,10 +15,27 @@
 ***************************************************************************/
 
 #include "emu.h"
+
+#ifndef QSOUND_LLE
+#define QSOUND_LLE
+#endif
+
 #include "qsoundhle.h"
+
+#include "qsound.h"
 
 #include <algorithm>
 #include <limits>
+
+//-------------------------------------------------
+//  parent_rom_device_type - get parent device type
+//  for ROM search
+//-------------------------------------------------
+
+inline auto qsound_hle_device::parent_rom_device_type()
+{
+	return &QSOUND;
+}
 
 // device type definition
 DEFINE_DEVICE_TYPE(QSOUND_HLE, qsound_hle_device, "qsound_hle", "QSound (HLE)")
@@ -50,10 +67,21 @@ qsound_hle_device::qsound_hle_device(const machine_config &mconfig, const char *
 }
 
 //-------------------------------------------------
-//  rom_bank_updated - the rom bank has changed
+//  rom_region - return a pointer to the device's
+//  internal ROM region
 //-------------------------------------------------
 
-void qsound_hle_device::rom_bank_updated()
+const tiny_rom_entry *qsound_hle_device::device_rom_region() const
+{
+	return ROM_NAME( qsound_hle );
+}
+
+//-------------------------------------------------
+//  rom_bank_pre_change - refresh the stream if the
+//  ROM banking changes
+//-------------------------------------------------
+
+void qsound_hle_device::rom_bank_pre_change()
 {
 	m_stream->update();
 }
@@ -136,16 +164,6 @@ void qsound_hle_device::device_start()
 }
 
 //-------------------------------------------------
-//  rom_region - return a pointer to the device's
-//  internal ROM region
-//-------------------------------------------------
-
-const tiny_rom_entry *qsound_hle_device::device_rom_region() const
-{
-	return ROM_NAME( qsound_hle );
-}
-
-//-------------------------------------------------
 //  device_reset - device-specific reset
 //-------------------------------------------------
 
@@ -161,17 +179,13 @@ void qsound_hle_device::device_reset()
 //  sound_stream_update - handle a stream update
 //-------------------------------------------------
 
-void qsound_hle_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void qsound_hle_device::sound_stream_update(sound_stream &stream)
 {
-	// Clear the buffers
-	std::fill_n(outputs[0], samples, 0);
-	std::fill_n(outputs[1], samples, 0);
-
-	for (int i = 0; i < samples; i ++)
+	for (int i = 0; i < stream.samples(); i ++)
 	{
 		update_sample();
-		outputs[0][i] = m_out[0];
-		outputs[1][i] = m_out[1];
+		stream.put_int(0, i, m_out[0], 32768);
+		stream.put_int(1, i, m_out[1], 32768);
 	}
 }
 
@@ -268,7 +282,7 @@ void qsound_hle_device::init_register_map()
 
 int16_t qsound_hle_device::read_sample(uint16_t bank, uint16_t address)
 {
-	bank &= 0x7FFF;
+	bank &= 0x7fff;
 	const uint32_t rom_addr = (bank << 16) | (address << 0);
 	const uint8_t sample_data = read_byte(rom_addr);
 	return (int16_t)(sample_data << 8); // bit0-7 is tied to ground
@@ -420,7 +434,7 @@ int16_t qsound_hle_device::qsound_voice::update(qsound_hle_device &dsp, int32_t 
 	if ((new_phase >> 12) >= m_end_addr)
 		new_phase -= (m_loop_len << 12);
 
-	new_phase = std::min<int32_t>(std::max<int32_t>(new_phase, -0x8000000), 0x7FFFFFF);
+	new_phase = std::clamp<int32_t>(new_phase, -0x8000000, 0x7FFFFFF);
 	m_addr = new_phase >> 12;
 	m_phase = (new_phase << 4)&0xffff;
 
@@ -469,10 +483,10 @@ int16_t qsound_hle_device::qsound_adpcm::update(qsound_hle_device &dsp, int16_t 
 	if (step <= 0)
 		delta = -delta;
 	delta += curr_sample;
-	delta = std::min<int32_t>(std::max<int32_t>(delta, -32768), 32767);
+	delta = std::clamp<int32_t>(delta, -32768, 32767);
 
 	m_step_size = (dsp.read_dsp_rom(DATA_ADPCM_TAB + 8 + step) * m_step_size) >> 6;
-	m_step_size = std::min<int16_t>(std::max<int16_t>(m_step_size, 1), 2000);
+	m_step_size = std::clamp<int16_t>(m_step_size, 1, 2000);
 
 	return (delta * m_cur_vol) >> 16;
 }
@@ -508,7 +522,7 @@ void qsound_hle_device::state_normal_update()
 	else
 		m_echo.m_length = m_echo.m_end_pos - DELAY_BASE_OFFSET;
 
-	m_echo.m_length = std::min<int16_t>(std::max<int16_t>(m_echo.m_length, 0), 1024);
+	m_echo.m_length = std::clamp<int16_t>(m_echo.m_length, 0, 1024);
 
 	// update PCM voices
 	int32_t echo_input = 0;
@@ -538,8 +552,8 @@ void qsound_hle_device::state_normal_update()
 			wet -= (m_voice_output[i] * (int16_t)read_dsp_rom(pan_index + PAN_TABLE_WET));
 		}
 		// Saturate accumulated voices
-		dry = (std::min<int32_t>(std::max<int32_t>(dry, -0x1fffffff), 0x1fffffff)) << 2;
-		wet = (std::min<int32_t>(std::max<int32_t>(wet, -0x1fffffff), 0x1fffffff)) << 2;
+		dry = std::clamp<int32_t>(dry, -0x1fffffff, 0x1fffffff) << 2;
+		wet = std::clamp<int32_t>(wet, -0x1fffffff, 0x1fffffff) << 2;
 
 		// Apply FIR filter on 'wet' input
 		wet = m_filter[ch].apply(wet >> 16);
@@ -553,7 +567,7 @@ void qsound_hle_device::state_normal_update()
 
 		// DSP round function
 		output = (output + 0x2000) & ~0x3fff;
-		m_out[ch] = (std::min<int32_t>(std::max<int32_t>(output >> 14, -0x7fff), 0x7fff));
+		m_out[ch] = std::clamp<int32_t>(output >> 14, -0x7fff, 0x7fff);
 
 		if (m_delay_update)
 		{

@@ -13,10 +13,11 @@
 
 #pragma once
 
-#ifdef PTR64
+#if defined(_M_X64) || (defined(_M_IX86_FP) && (_M_IX86_FP >= 2))
 #include <emmintrin.h>
-#include <intrin.h>
 #endif
+
+#include <intrin.h>
 
 
 /***************************************************************************
@@ -28,9 +29,9 @@
     multiply and return the full 64 bit result
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define mul_32x32 _mul_32x32
-static inline int64_t _mul_32x32(int32_t a, int32_t b)
+inline int64_t _mul_32x32(int32_t a, int32_t b)
 {
 	// in theory this should work, but it is untested
 	__asm
@@ -49,9 +50,9 @@ static inline int64_t _mul_32x32(int32_t a, int32_t b)
     result
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define mulu_32x32 _mulu_32x32
-static inline uint64_t _mulu_32x32(uint32_t a, uint32_t b)
+inline uint64_t _mulu_32x32(uint32_t a, uint32_t b)
 {
 	// in theory this should work, but it is untested
 	__asm
@@ -70,9 +71,9 @@ static inline uint64_t _mulu_32x32(uint32_t a, uint32_t b)
     result
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define mul_32x32_hi _mul_32x32_hi
-static inline int32_t _mul_32x32_hi(int32_t a, int32_t b)
+inline int32_t _mul_32x32_hi(int32_t a, int32_t b)
 {
 	int32_t result;
 
@@ -94,9 +95,9 @@ static inline int32_t _mul_32x32_hi(int32_t a, int32_t b)
     of the result
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define mulu_32x32_hi _mulu_32x32_hi
-static inline uint32_t _mulu_32x32_hi(uint32_t a, uint32_t b)
+inline uint32_t _mulu_32x32_hi(uint32_t a, uint32_t b)
 {
 	int32_t result;
 
@@ -119,7 +120,7 @@ static inline uint32_t _mulu_32x32_hi(uint32_t a, uint32_t b)
     result to 32 bits
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define mul_32x32_shift _mul_32x32_shift
 static inline int32_t _mul_32x32_shift(int32_t a, int32_t b, uint8_t shift)
 {
@@ -146,9 +147,9 @@ static inline int32_t _mul_32x32_shift(int32_t a, int32_t b, uint8_t shift)
     result to 32 bits
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define mulu_32x32_shift _mulu_32x32_shift
-static inline uint32_t _mulu_32x32_shift(uint32_t a, uint32_t b, uint8_t shift)
+inline uint32_t _mulu_32x32_shift(uint32_t a, uint32_t b, uint8_t shift)
 {
 	int32_t result;
 
@@ -171,9 +172,9 @@ static inline uint32_t _mulu_32x32_shift(uint32_t a, uint32_t b, uint8_t shift)
     divide and return the 32 bit quotient
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define div_64x32 _div_64x32
-static inline int32_t _div_64x32(int64_t a, int32_t b)
+inline int32_t _div_64x32(int64_t a, int32_t b)
 {
 	int32_t result;
 	int32_t alow = a;
@@ -197,9 +198,9 @@ static inline int32_t _div_64x32(int64_t a, int32_t b)
     divide and return the 32 bit quotient
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define divu_64x32 _divu_64x32
-static inline uint32_t _divu_64x32(uint64_t a, uint32_t b)
+inline uint32_t _divu_64x32(uint64_t a, uint32_t b)
 {
 	uint32_t result;
 	uint32_t alow = a;
@@ -224,9 +225,9 @@ static inline uint32_t _divu_64x32(uint64_t a, uint32_t b)
     32 bit remainder
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define div_64x32_rem _div_64x32_rem
-static inline int32_t _div_64x32_rem(int64_t a, int32_t b, int32_t *remainder)
+inline int32_t _div_64x32_rem(int64_t a, int32_t b, int32_t &remainder)
 {
 	int32_t result;
 	int32_t alow = a;
@@ -242,7 +243,7 @@ static inline int32_t _div_64x32_rem(int64_t a, int32_t b, int32_t *remainder)
 		mov   rem,edx
 	}
 
-	*remainder = rem;
+	remainder = rem;
 	return result;
 }
 #endif
@@ -254,9 +255,9 @@ static inline int32_t _div_64x32_rem(int64_t a, int32_t b, int32_t *remainder)
     and 32 bit remainder
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define divu_64x32_rem _divu_64x32_rem
-static inline uint32_t _divu_64x32_rem(uint64_t a, uint32_t b, uint32_t *remainder)
+inline uint32_t _divu_64x32_rem(uint64_t a, uint32_t b, uint32_t &remainder)
 {
 	uint32_t result;
 	uint32_t alow = a;
@@ -272,7 +273,7 @@ static inline uint32_t _divu_64x32_rem(uint64_t a, uint32_t b, uint32_t *remaind
 		mov   rem,edx
 	}
 
-	*remainder = rem;
+	remainder = rem;
 	return result;
 }
 #endif
@@ -284,9 +285,9 @@ static inline uint32_t _divu_64x32_rem(uint64_t a, uint32_t b, uint32_t *remaind
     division, and returning the 32 bit quotient
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define div_32x32_shift _div_32x32_shift
-static inline int32_t _div_32x32_shift(int32_t a, int32_t b, uint8_t shift)
+inline int32_t _div_32x32_shift(int32_t a, int32_t b, uint8_t shift)
 {
 	int32_t result;
 
@@ -312,9 +313,9 @@ static inline int32_t _div_32x32_shift(int32_t a, int32_t b, uint8_t shift)
     division, and returning the 32 bit quotient
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define divu_32x32_shift _divu_32x32_shift
-static inline uint32_t _divu_32x32_shift(uint32_t a, uint32_t b, uint8_t shift)
+inline uint32_t _divu_32x32_shift(uint32_t a, uint32_t b, uint8_t shift)
 {
 	uint32_t result;
 
@@ -339,7 +340,7 @@ static inline uint32_t _divu_32x32_shift(uint32_t a, uint32_t b, uint8_t shift)
     divide and return the 32 bit remainder
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define mod_64x32 _mod_64x32
 static inline int32_t _mod_64x32(int64_t a, int32_t b)
 {
@@ -365,9 +366,9 @@ static inline int32_t _mod_64x32(int64_t a, int32_t b)
     divide and return the 32 bit remainder
 -------------------------------------------------*/
 
-#ifndef PTR64
+#ifndef _M_X64
 #define modu_64x32 _modu_64x32
-static inline uint32_t _modu_64x32(uint64_t a, uint32_t b)
+inline uint32_t _modu_64x32(uint64_t a, uint32_t b)
 {
 	uint32_t result;
 	uint32_t alow = a;
@@ -391,9 +392,9 @@ static inline uint32_t _modu_64x32(uint64_t a, uint32_t b)
     point reciprocal
 -------------------------------------------------*/
 
-#ifdef PTR64
+#if defined(_M_X64) || (defined(_M_IX86_FP) && (_M_IX86_FP >= 2))
 #define recip_approx _recip_approx
-static inline float _recip_approx(float z)
+inline float _recip_approx(float z)
 {
 	__m128 const mz = _mm_set_ss(z);
 	__m128 const mooz = _mm_rcp_ss(mz);
@@ -409,8 +410,12 @@ static inline float _recip_approx(float z)
     multiply and return the full 128 bit result
 -------------------------------------------------*/
 
-#ifdef PTR64
-#define mul_64x64 _mul128
+#ifdef _M_X64
+#define mul_64x64 _mul_64x64
+__forceinline int64_t _mul_64x64(int64_t a, int64_t b, int64_t &hi)
+{
+	return _mul128(a, b, &hi);
+}
 #endif
 
 
@@ -419,8 +424,45 @@ static inline float _recip_approx(float z)
     bit multiply and return the full 128 bit result
 -------------------------------------------------*/
 
-#ifdef PTR64
-#define mulu_64x64 _umul128
+#ifdef _M_X64
+#define mulu_64x64 _mulu_64x64
+__forceinline int64_t _mulu_64x64(uint64_t a, uint64_t b, uint64_t &hi)
+{
+	return _umul128(a, b, &hi);
+}
 #endif
+
+
+/*-------------------------------------------------
+    addu_32x32_co - perform an unsigned 32 bit + 32
+    bit addition and return the result with carry
+    out
+-------------------------------------------------*/
+
+#define addu_32x32_co _addu_32x32_co
+__forceinline bool _addu_32x32_co(uint32_t a, uint32_t b, uint32_t &sum)
+{
+	return _addcarry_u32(0, a, b, &sum);
+}
+
+
+/*-------------------------------------------------
+    addu_64x64_co - perform an unsigned 64 bit + 64
+    bit addition and return the result with carry
+    out
+-------------------------------------------------*/
+
+#define addu_64x64_co _addu_64x64_co
+__forceinline bool _addu_64x64_co(uint64_t a, uint64_t b, uint64_t &sum)
+{
+#ifdef _M_X64
+	return _addcarry_u64(0, a, b, &sum);
+#else
+	uint32_t l, h;
+	bool const result = _addcarry_u32(_addcarry_u32(0, uint32_t(a), uint32_t(b), &l), uint32_t(a >> 32), uint32_t(b >> 32), &h);
+	sum = (uint64_t(h) << 32) | l;
+	return result;
+#endif
+}
 
 #endif // MAME_OSD_EIVCX86_H

@@ -2,7 +2,6 @@
 // copyright-holders:Olivier Galibert
 
 #include "emu.h"
-#include "debugger.h"
 #include "mb86233.h"
 #include "mb86233d.h"
 
@@ -13,7 +12,7 @@
 
   The 86232 has 512 32-bits dwords of triple-port memory (1 write, 2
   read).  The 86233/86234 have instead two normal (1 read, 1 write,
-  non-simultaneous) independant ram banks, one of 256 dwords and one
+  non-simultaneous) independent ram banks, one of 256 dwords and one
   of 512.
 
   The ram banks are mapped at 0x000-0x0ff and 0x200-0x3ff (proven by
@@ -42,6 +41,13 @@
   It's unclear whether some register-file linked functionality is
   internal or external though (fifos, banking in model2/86234), so
   there may lie the actual differences.
+
+  Note: in the event of two writes occurring at the same register in a
+  single instruction, priority appears to vary depending on the ALU
+  operation. Transfers appear to take precedence over integer ops, while
+  floating point ops take precedence over transfers. This may be a result
+  of the ALU unit taking more than one cycle to execute floating point ops
+  (86232 datasheet), hence the register is updated after the transfer.
 */
 
 
@@ -96,7 +102,7 @@ void mb86233_device::device_start()
 
 	state_add(STATE_GENPC,     "GENPC", m_pc);
 	state_add(STATE_GENPCBASE, "PC",    m_ppc).noshow();
-	state_add(STATE_GENSP,     "SP",    m_sp);
+	state_add(REG_SP,          "SP",    m_sp);
 	state_add(STATE_GENFLAGS,  "ST",    m_st);
 
 	state_add(REG_A,           "A",     m_a);
@@ -166,22 +172,22 @@ void mb86233_device::state_string_export(const device_state_entry &entry, std::s
 {
 }
 
-WRITE_LINE_MEMBER(mb86233_device::gpio0_w)
+void mb86233_device::gpio0_w(int state)
 {
 	m_gpio0 = state;
 }
 
-WRITE_LINE_MEMBER(mb86233_device::gpio1_w)
+void mb86233_device::gpio1_w(int state)
 {
 	m_gpio1 = state;
 }
 
-WRITE_LINE_MEMBER(mb86233_device::gpio2_w)
+void mb86233_device::gpio2_w(int state)
 {
 	m_gpio2 = state;
 }
 
-WRITE_LINE_MEMBER(mb86233_device::gpio3_w)
+void mb86233_device::gpio3_w(int state)
 {
 	m_gpio3 = state;
 }
@@ -223,14 +229,6 @@ void mb86233_device::device_reset()
 	m_stall = false;
 }
 
-s32 mb86233_device::s24_32(u32 val)
-{
-	if(val & 0x00800000)
-		return val | 0xff000000;
-	else
-		return val & 0x00ffffff;
-}
-
 u32 mb86233_device::set_exp(u32 val, u32 exp)
 {
 	return (val & 0x807fffff) | ((exp & 0xff) << 23);
@@ -265,16 +263,14 @@ void mb86233_device::pcs_pop()
 		m_pcs[i] = m_pcs[i+1];
 }
 
-void mb86233_device::testdz()
+void mb86233_device::stset_set_sz_int(u32 val)
 {
-	if(m_d)
-		m_st &= ~F_ZRD;
-	else
-		m_st |= F_ZRD;
-	if(m_d & 0x80000000)
-		m_st |= F_SGD;
-	else
-		m_st &= ~F_SGD;
+	m_alu_stset = val ? (val & 0x80000000 ? F_SGD : 0) : F_ZRD;
+}
+
+void mb86233_device::stset_set_sz_fp(u32 val)
+{
+	m_alu_stset = (val & 0x7fffffff) ? (val & 0x80000000 ? F_SGD : 0) : F_ZRD;
 }
 
 void mb86233_device::alu_pre(u32 alu)
@@ -286,7 +282,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// andd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d & m_a;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -294,7 +290,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// orad
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d | m_a;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -302,7 +298,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// eord
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d ^ m_a;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -310,7 +306,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// notd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = ~m_d;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -318,15 +314,15 @@ void mb86233_device::alu_pre(u32 alu)
 		// fcpd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		u32 r = f2u(u2f(m_d) - u2f(m_a));
-		m_alu_stset = r ? r & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(r);
 		break;
 	}
 
 	case 0x06: {
-		// fmad
+		// fadd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_d) + u2f(m_a));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -334,7 +330,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// fsbd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_d) - u2f(m_a));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -351,7 +347,7 @@ void mb86233_device::alu_pre(u32 alu)
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_d) + u2f(m_p));
 		m_alu_r2 = f2u(u2f(m_a) * u2f(m_b));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -360,7 +356,7 @@ void mb86233_device::alu_pre(u32 alu)
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_d) - u2f(m_p));
 		m_alu_r2 = f2u(u2f(m_a) * u2f(m_b));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -368,7 +364,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// fabd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d & 0x7fffffff;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -376,7 +372,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// fsmd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_d) + u2f(m_p));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -385,7 +381,7 @@ void mb86233_device::alu_pre(u32 alu)
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_p;
 		m_alu_r2 = f2u(u2f(m_a) * u2f(m_b));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -393,7 +389,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// cxfd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(s32(m_d));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -406,7 +402,7 @@ void mb86233_device::alu_pre(u32 alu)
 		case 2: m_alu_r1 = s32(floorf(u2f(m_d))); break;
 		case 3: m_alu_r1 = s32(u2f(m_d)); break;
 		}
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -414,7 +410,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// fdvd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_d) / u2f(m_a));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -422,7 +418,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// fned
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d ? m_d ^ 0x80000000 : 0;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -430,7 +426,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// d = b + a
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_b) + u2f(m_a));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -438,7 +434,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// d = b - a
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = f2u(u2f(m_b) - u2f(m_a));
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_fp(m_alu_r1);
 		break;
 	}
 
@@ -446,7 +442,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// lsrd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d >> m_sft;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -454,7 +450,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// lsld
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d << m_sft;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -462,7 +458,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// asrd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = s32(m_d) >> m_sft;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -470,7 +466,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// asld
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = s32(m_d) << m_sft;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -478,7 +474,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// addd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d + m_a;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -486,7 +482,7 @@ void mb86233_device::alu_pre(u32 alu)
 		// subd
 		m_alu_stmask = F_ZRD|F_SGD|F_CPD|F_OVD|F_DVZD;
 		m_alu_r1 = m_d - m_a;
-		m_alu_stset = m_alu_r1 ? m_alu_r1 & 0x80000000 ? F_SGD : 0 : F_ZRD;
+		stset_set_sz_int(m_alu_r1);
 		break;
 	}
 
@@ -501,40 +497,57 @@ void mb86233_device::alu_update_st()
 	m_st = (m_st & ~m_alu_stmask) | m_alu_stset;
 }
 
-void mb86233_device::alu_post(u32 alu)
+void mb86233_device::alu_post_1(u32 alu)
 {
+	// integer alu post ops
 	switch(alu) {
-	case 0x00: break; // no alu
-
-	case 0x05:
-		// flags only
-		alu_update_st();
-		break;
-
 	case 0x01: case 0x02: case 0x03: case 0x04:
-	case 0x06: case 0x07: case 0x0b: case 0x0c:
-	case 0x0e: case 0x0f: case 0x10: case 0x11:
-	case 0x13: case 0x14: case 0x16: case 0x17:
+	case 0x0e: case 0x0f: case 0x16: case 0x17:
 	case 0x18: case 0x19: case 0x1a: case 0x1b:
 		// d update
 		m_d = m_alu_r1;
 		alu_update_st();
 		break;
 
+	default:
+		break;
+	}
+}
+
+void mb86233_device::alu_post_2(u32 alu)
+{
+	// floating point alu post ops
+	// assume each one takes 2 cycles
+	switch (alu) {
+	case 0x05:
+		// flags only
+		alu_update_st();
+		m_icount--;
+		break;
+
+	case 0x06: case 0x07: case 0x0b: case 0x0c:
+	case 0x10: case 0x11: case 0x13: case 0x14:
+		// d update
+		m_d = m_alu_r1;
+		alu_update_st();
+		m_icount--;
+		break;
+
 	case 0x08:
 		// p update
 		m_p = m_alu_r1;
+		m_icount--;
 		break;
 
-	case 0x09: case 0x0a: case 0xd:
+	case 0x09: case 0x0a: case 0x0d:
 		// d, p update
 		m_d = m_alu_r1;
 		m_p = m_alu_r2;
 		alu_update_st();
+		m_icount--;
 		break;
 
 	default:
-		logerror("unhandled alu post %02x\n", alu);
 		break;
 	}
 }
@@ -562,12 +575,8 @@ void mb86233_device::ea_post_0(u32 r)
 		return;
 	if(!(r & 0x080))
 		m_x0 += m_i0;
-	else {
-		if(r & 0x10)
-			m_x0 += (r & 0xf) - 0x10;
-		else
-			m_x0 += r & 0xf;
-	}
+	else
+		m_x0 += util::sext(r, 5);
 }
 
 u16 mb86233_device::ea_pre_1(u32 r)
@@ -593,12 +602,8 @@ void mb86233_device::ea_post_1(u32 r)
 		return;
 	if(!(r & 0x080))
 		m_x1 += m_i1;
-	else {
-		if(r & 0x10)
-			m_x1 += (r & 0xf) - 0x10;
-		else
-			m_x1 += r & 0xf;
-	}
+	else
+		m_x1 += util::sext(r, 5);
 }
 
 u32 mb86233_device::read_reg(u32 r)
@@ -683,9 +688,9 @@ void mb86233_device::write_reg(u32 r, u32 v)
 	case 0x14: m_b = set_exp(m_b, v); break;
 	case 0x15: m_b = set_mant(m_b, v); break;
 		/* c */
-	case 0x19: m_d = v; testdz(); break;
-	case 0x1a: m_d = set_exp(m_d, v); testdz(); break;
-	case 0x1b: m_d = set_mant(m_d, v); testdz(); break;
+	case 0x19: m_d = v; break;
+	case 0x1a: m_d = set_exp(m_d, v); break;
+	case 0x1b: m_d = set_mant(m_d, v); break;
 	case 0x1c: m_p = v; break;
 	case 0x1d: m_p = set_exp(m_p, v); break;
 	case 0x1e: m_p = set_mant(m_p, v); break;
@@ -798,7 +803,8 @@ void mb86233_device::execute_run()
 
 			}
 
-			alu_post(alu);
+			alu_post_1(alu);
+			alu_post_2(alu);
 			break;
 		}
 
@@ -819,6 +825,7 @@ void mb86233_device::execute_run()
 				u32 v = m_data.read_dword(ea);
 				if(m_stall) goto do_stall;
 				ea_post_0(r1);
+				alu_post_1(alu);
 				write_mem_io_1(r2, v);
 				break;
 			}
@@ -829,6 +836,7 @@ void mb86233_device::execute_run()
 				u32 v = m_data.read_dword(ea);
 				if(m_stall) goto do_stall;
 				ea_post_0(r1);
+				alu_post_1(alu);
 				write_mem_io_1(r2, v);
 				break;
 			}
@@ -839,6 +847,7 @@ void mb86233_device::execute_run()
 				u32 v = m_io.read_dword(ea);
 				if(m_stall) goto do_stall;
 				ea_post_0(r1);
+				alu_post_1(alu);
 				write_mem_internal_1(r2, v, false);
 				break;
 			}
@@ -849,6 +858,7 @@ void mb86233_device::execute_run()
 				u32 v = m_data.read_dword(ea);
 				if(m_stall) goto do_stall;
 				ea_post_0(r1);
+				alu_post_1(alu);
 				write_mem_internal_1(r2, v, true);
 				break;
 			}
@@ -859,6 +869,7 @@ void mb86233_device::execute_run()
 				u32 v = m_data.read_dword(ea);
 				if(m_stall) goto do_stall;
 				ea_post_0(r1);
+				alu_post_1(alu);
 				write_mem_internal_1(r2, v, false);
 				break;
 			}
@@ -869,6 +880,7 @@ void mb86233_device::execute_run()
 				u32 v = m_program.read_dword(ea);
 				if(m_stall) goto do_stall;
 				ea_post_0(r1);
+				alu_post_1(alu);
 				write_mem_internal_1(r2, v, false);
 				break;
 			}
@@ -879,6 +891,7 @@ void mb86233_device::execute_run()
 					// mov reg, mem
 					u32 v = read_reg(r2);
 					if(m_stall) goto do_stall;
+					alu_post_1(alu);
 					write_mem_internal_1(r1, v, false);
 					break;
 				}
@@ -887,6 +900,7 @@ void mb86233_device::execute_run()
 					// mov reg, mem (e)
 					u32 v = read_reg(r2);
 					if(m_stall) goto do_stall;
+					alu_post_1(alu);
 					write_mem_io_1(r1, v);
 					break;
 				}
@@ -897,6 +911,7 @@ void mb86233_device::execute_run()
 					u32 v = m_data.read_dword(ea);
 					if(m_stall) goto do_stall;
 					ea_post_1(r1);
+					alu_post_1(alu);
 					write_reg(r2, v);
 					break;
 				}
@@ -907,6 +922,7 @@ void mb86233_device::execute_run()
 					u32 v = m_data.read_dword(ea);
 					if(m_stall) goto do_stall;
 					ea_post_1(r1);
+					alu_post_1(alu);
 					write_reg(r2, v);
 					break;
 				}
@@ -917,6 +933,7 @@ void mb86233_device::execute_run()
 					u32 v = m_io.read_dword(ea);
 					if(m_stall) goto do_stall;
 					ea_post_1(r1);
+					alu_post_1(alu);
 					write_reg(r2, v);
 					break;
 				}
@@ -927,6 +944,7 @@ void mb86233_device::execute_run()
 					u32 v = m_program.read_dword(ea);
 					if(m_stall) goto do_stall;
 					ea_post_0(r1);
+					alu_post_1(alu);
 					write_reg(r2, v);
 					break;
 				}
@@ -935,11 +953,13 @@ void mb86233_device::execute_run()
 					// mov reg, reg
 					u32 v = read_reg(r1);
 					if(m_stall) goto do_stall;
+					alu_post_1(alu);
 					write_reg(r2, v);
 					break;
 				}
 
 				default:
+					alu_post_1(alu);
 					logerror("unhandled ld/mov subop 7/%x (%x)\n", r2 >> 6, m_ppc);
 					break;
 				}
@@ -947,11 +967,13 @@ void mb86233_device::execute_run()
 			}
 
 			default:
+				alu_post_1(alu);
 				logerror("unhandled ld/mov subop %x (%x)\n", op, m_ppc);
 				break;
 			}
 
-			alu_post(alu);
+			// For floating point ops, registers are updated after transfer
+			alu_post_2(alu);
 			break;
 		}
 
@@ -983,14 +1005,13 @@ void mb86233_device::execute_run()
 				m_p = (m_p & 0xffffff000000) | (opcode & 0xffffff);
 				break;
 			case 1:
-				m_a = s24_32(opcode);
+				m_a = util::sext(opcode, 24);
 				break;
 			case 2:
-				m_b = s24_32(opcode);
+				m_b = util::sext(opcode, 24);
 				break;
 			case 3:
-				m_d = s24_32(opcode);
-				testdz();
+				m_d = util::sext(opcode, 24);
 				break;
 			}
 			break;
@@ -1033,14 +1054,14 @@ void mb86233_device::execute_run()
 				break;
 			}
 
-			alu_post(alu);
+			alu_post_1(alu);
 			break;
 		}
 
 		case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17:
 		case 0x18: case 0x19: case 0x1a: case 0x1b: case 0x1c: case 0x1d: case 0x1e: case 0x1f: {
 			// ldi
-			write_reg(opcode >> 24, s24_32(opcode));
+			write_reg(opcode >> 24, util::sext(opcode, 24));
 			break;
 		}
 

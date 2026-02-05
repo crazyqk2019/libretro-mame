@@ -5,7 +5,7 @@
  *   arm7core.h
  *   Portable ARM7TDMI Core Emulator
  *
- *   Copyright Steve Ellenoff, all rights reserved.
+ *   Copyright Steve Ellenoff
  *
  *  This work is based on:
  *  #1) 'Atmel Corporation ARM7TDMI (Thumb) Datasheet - January 1999'
@@ -18,38 +18,20 @@
 
  ******************************************************************************/
 
+#ifndef MAME_CPU_ARM7_ARM7CORE_H
+#define MAME_CPU_ARM7_ARM7CORE_H
+
 #pragma once
 
-#ifndef __ARM7CORE_H__
-#define __ARM7CORE_H__
+#include "arm7.h"
 
 #define ARM7_MMU_ENABLE_HACK 0
 #define ARM7_DEBUG_CORE 0
 
 
 /****************************************************************************************************
- *  INTERRUPT LINES/EXCEPTIONS
- ***************************************************************************************************/
-enum
-{
-	ARM7_IRQ_LINE=0, ARM7_FIRQ_LINE,
-	ARM7_ABORT_EXCEPTION, ARM7_ABORT_PREFETCH_EXCEPTION, ARM7_UNDEFINE_EXCEPTION,
-	ARM7_NUM_LINES
-};
-// Really there's only 1 ABORT Line.. and cpu decides whether it's during data fetch or prefetch, but we let the user specify
-
-/****************************************************************************************************
  *  ARM7 CORE REGISTERS
  ***************************************************************************************************/
-enum
-{
-	ARM7_PC = 0,
-	ARM7_R0, ARM7_R1, ARM7_R2, ARM7_R3, ARM7_R4, ARM7_R5, ARM7_R6, ARM7_R7,
-	ARM7_R8, ARM7_R9, ARM7_R10, ARM7_R11, ARM7_R12, ARM7_R13, ARM7_R14, ARM7_R15,
-	ARM7_FR8, ARM7_FR9, ARM7_FR10, ARM7_FR11, ARM7_FR12, ARM7_FR13, ARM7_FR14,
-	ARM7_IR13, ARM7_IR14, ARM7_SR13, ARM7_SR14, ARM7_FSPSR, ARM7_ISPSR, ARM7_SSPSR,
-	ARM7_CPSR, ARM7_AR13, ARM7_AR14, ARM7_ASPSR, ARM7_UR13, ARM7_UR14, ARM7_USPSR
-};
 
 /* There are 36 Unique - 32 bit processor registers */
 /* Each mode has 17 registers (except user & system, which have 16) */
@@ -83,6 +65,19 @@ enum
 };
 
 /* Coprocessor-related macros */
+#define COPRO_DOMAIN_NO_ACCESS              0
+#define COPRO_DOMAIN_CLIENT                 1
+#define COPRO_DOMAIN_RESV                   2
+#define COPRO_DOMAIN_MANAGER                3
+
+#define COPRO_FAULT_NONE                    0
+#define COPRO_FAULT_TRANSLATE_SECTION       5
+#define COPRO_FAULT_TRANSLATE_PAGE          7
+#define COPRO_FAULT_DOMAIN_SECTION          9
+#define COPRO_FAULT_DOMAIN_PAGE             11
+#define COPRO_FAULT_PERM_SECTION            13
+#define COPRO_FAULT_PERM_PAGE               15
+
 #define COPRO_TLB_BASE                      m_tlbBase
 #define COPRO_TLB_BASE_MASK                 0xffffc000
 #define COPRO_TLB_VADDR_FLTI_MASK           0xfff00000
@@ -99,6 +94,9 @@ enum
 #define COPRO_TLB_LARGE_PAGE_MASK           0xffff0000
 #define COPRO_TLB_SMALL_PAGE_MASK           0xfffff000
 #define COPRO_TLB_TINY_PAGE_MASK            0xfffffc00
+#define COPRO_TLB_STABLE_MASK               0xfff00000
+#define COPRO_TLB_LSTABLE_MASK              0xfffff000
+#define COPRO_TLB_TTABLE_MASK               0xfffffc00
 #define COPRO_TLB_UNMAPPED                  0
 #define COPRO_TLB_LARGE_PAGE                1
 #define COPRO_TLB_SMALL_PAGE                2
@@ -106,6 +104,10 @@ enum
 #define COPRO_TLB_COARSE_TABLE              1
 #define COPRO_TLB_SECTION_TABLE             2
 #define COPRO_TLB_FINE_TABLE                3
+#define COPRO_TLB_TYPE_SECTION              0
+#define COPRO_TLB_TYPE_LARGE                1
+#define COPRO_TLB_TYPE_SMALL                2
+#define COPRO_TLB_TYPE_TINY                 3
 
 #define COPRO_CTRL                          m_control
 #define COPRO_CTRL_MMU_EN                   0x00000001
@@ -187,6 +189,7 @@ struct arm_state
 /****************************************************************************************************
  *  VARIOUS INTERNAL STRUCS/DEFINES/ETC..
  ***************************************************************************************************/
+
 // Mode values come from bit 4-0 of CPSR, but we are ignoring bit 4 here, since bit 4 always = 1 for valid modes
 enum
 {
@@ -312,7 +315,7 @@ static const int sRegisterTable[ARM7_NUM_MODES][18] =
 #define T_IS_CLEAR(pc)  (!T_IS_SET(pc))
 
 /* Deconstructing an instruction */
-// todo: use these in all places (including dasm file)
+// TODO: use these in all places (including dasm file)
 #define INSN_COND           ((uint32_t)0xf0000000u)
 #define INSN_SDT_L          ((uint32_t)0x00100000u)
 #define INSN_SDT_W          ((uint32_t)0x00200000u)
@@ -496,19 +499,69 @@ enum
 #define ARM7_TLB_WRITE   (1 << 3)
 
 /* ARM flavors */
-enum arm_flavor
+enum arm7_cpu_device::arm_arch_flag : uint32_t
 {
-	/* ARM7 variants */
-	ARM_TYPE_ARM7,
-	ARM_TYPE_ARM7BE,
-	ARM_TYPE_ARM7500,
-	ARM_TYPE_PXA255,
-	ARM_TYPE_SA1110,
-
-	/* ARM9 variants */
-	ARM_TYPE_ARM9,
-	ARM_TYPE_ARM920T,
-	ARM_TYPE_ARM946ES
+	ARCHFLAG_T        = 1U << 0,    // Thumb present
+	ARCHFLAG_E        = 1U << 1,    // extended DSP operations present (only for v5+)
+	ARCHFLAG_J        = 1U << 2,    // "Jazelle" (direct execution of Java bytecode)
+	ARCHFLAG_MMU      = 1U << 3,    // has on-board MMU (traditional ARM style like the SA1110)
+	ARCHFLAG_SA       = 1U << 4,    // StrongARM extensions (enhanced TLB)
+	ARCHFLAG_XSCALE   = 1U << 5,    // XScale extensions (CP14, enhanced TLB)
+	ARCHFLAG_MODE26   = 1U << 6,    // supports 26-bit backwards compatibility mode
+	ARCHFLAG_K        = 1U << 7,    // enhanced MMU extensions present (only for v6)
+	ARCHFLAG_T2       = 1U << 8,    // Thumb-2 present
 };
 
-#endif /* __ARM7CORE_H__ */
+enum arm7_cpu_device::arm_copro_id : uint32_t
+{
+	ARM9_COPRO_ID_STEP_SA1100_A = 0,
+	ARM9_COPRO_ID_STEP_SA1100_B = 1,
+	ARM9_COPRO_ID_STEP_SA1100_C = 2,
+	ARM9_COPRO_ID_STEP_SA1100_D = 8,
+	ARM9_COPRO_ID_STEP_SA1100_E = 9,
+	ARM9_COPRO_ID_STEP_SA1100_G = 11,
+
+	ARM9_COPRO_ID_STEP_SA1110_A0 = 0,
+	ARM9_COPRO_ID_STEP_SA1110_B0 = 4,
+	ARM9_COPRO_ID_STEP_SA1110_B1 = 5,
+	ARM9_COPRO_ID_STEP_SA1110_B2 = 6,
+	ARM9_COPRO_ID_STEP_SA1110_B4 = 8,
+
+	ARM9_COPRO_ID_STEP_PXA255_A0 = 6,
+
+	ARM9_COPRO_ID_STEP_ARM946_A0 = 1,
+
+	ARM9_COPRO_ID_STEP_ARM1176JZF_S_R0P0 = 0,
+	ARM9_COPRO_ID_STEP_ARM1176JZF_S_R0P7 = 7,
+
+	ARM9_COPRO_ID_PART_ARM1176JZF_S = 0xb76 << 4,
+	ARM9_COPRO_ID_PART_SA1100 = 0xa11 << 4,
+	ARM9_COPRO_ID_PART_SA1110 = 0xb11 << 4,
+	ARM9_COPRO_ID_PART_ARM946 = 0x946 << 4,
+	ARM9_COPRO_ID_PART_ARM920 = 0x920 << 4,
+	ARM9_COPRO_ID_PART_ARM710 = 0x710 << 4,
+	ARM9_COPRO_ID_PART_PXA250 = 0x200 << 4,
+	ARM9_COPRO_ID_PART_PXA255 = 0x2d0 << 4,
+	ARM9_COPRO_ID_PART_PXA270 = 0x411 << 4,
+	ARM9_COPRO_ID_PART_GENERICARM7 = 0x700 << 4,
+
+	ARM9_COPRO_ID_PXA255_CORE_REV_SHIFT = 10,
+
+	ARM9_COPRO_ID_ARCH_V4     = 0x01 << 16,
+	ARM9_COPRO_ID_ARCH_V4T    = 0x02 << 16,
+	ARM9_COPRO_ID_ARCH_V5     = 0x03 << 16,
+	ARM9_COPRO_ID_ARCH_V5T    = 0x04 << 16,
+	ARM9_COPRO_ID_ARCH_V5TE   = 0x05 << 16,
+	ARM9_COPRO_ID_ARCH_V5TEJ  = 0x06 << 16,
+	ARM9_COPRO_ID_ARCH_V6     = 0x07 << 16,
+	ARM9_COPRO_ID_ARCH_CPUID  = 0x0f << 16,
+
+	ARM9_COPRO_ID_SPEC_REV0   = 0x00 << 20,
+	ARM9_COPRO_ID_SPEC_REV1   = 0x01 << 20,
+
+	ARM9_COPRO_ID_MFR_ARM = 0x41 << 24,
+	ARM9_COPRO_ID_MFR_DEC = 0x44 << 24,
+	ARM9_COPRO_ID_MFR_INTEL = 0x69 << 24
+};
+
+#endif // MAME_CPU_ARM7_ARM7CORE_H

@@ -17,7 +17,7 @@
 
 #include "colorbus.h"
 
-namespace bus { namespace ti99 { namespace colorbus {
+namespace bus::ti99::colorbus {
 
 class v9938_busmouse_device : public device_t, public device_v9938_colorbus_interface
 {
@@ -27,8 +27,8 @@ public:
 	DECLARE_INPUT_CHANGED_MEMBER( mouse_pos_changed );
 
 protected:
-	void device_start() override;
-	void device_reset() override;
+	void device_start() override ATTR_COLD;
+	void device_reset() override ATTR_COLD;
 	ioport_constructor device_input_ports() const override;
 
 private:
@@ -37,7 +37,8 @@ private:
 	int m_last_y;
 	int m_bstate;
 };
-} } } // end namespace bus::ti99::colorbus
+
+} // end namespace bus::ti99::colorbus
 
 DECLARE_DEVICE_TYPE_NS(V9938_BUSMOUSE, bus::ti99::colorbus, v9938_busmouse_device)
 

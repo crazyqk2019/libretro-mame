@@ -5,8 +5,10 @@
 #include "aicadsp.h"
 
 #include <algorithm>
+#include <cassert>
 
-static u16 PACK(s32 val)
+
+static u16 PACK(s32 val) noexcept
 {
 	const int sign = (val >> 23) & 0x1;
 	u32 temp = (val ^ (val << 1)) & 0xFFFFFF;
@@ -30,7 +32,7 @@ static u16 PACK(s32 val)
 	return (u16)val;
 }
 
-static s32 UNPACK(u16 val)
+static s32 UNPACK(u16 val) noexcept
 {
 	const int sign = (val >> 15) & 0x1;
 	int exponent = (val >> 11) & 0xF;
@@ -51,11 +53,25 @@ static s32 UNPACK(u16 val)
 	return uval;
 }
 
-void AICADSP::init()
+void AICADSP::init() noexcept
 {
-	memset(this,0,sizeof(*this));
-	RBL = (8 * 1024); // Initial RBL is 0
+	RBP = 0;
+	RBL = 8 * 1024; // Initial RBL is 0
+
+	std::fill(std::begin(COEF), std::end(COEF), 0);
+	std::fill(std::begin(MADRS), std::end(MADRS), 0);
+	std::fill(std::begin(MPRO), std::end(MPRO), 0);
+	std::fill(std::begin(TEMP), std::end(TEMP), 0);
+	std::fill(std::begin(MEMS), std::end(MEMS), 0);
+	DEC = 0;
+
+	std::fill(std::begin(MIXS), std::end(MIXS), 0);
+	std::fill(std::begin(EXTS), std::end(EXTS), 0);
+
+	std::fill(std::begin(EFREG), std::end(EFREG), 0);
+
 	Stopped = true;
+	LastStep = 0;
 }
 
 void AICADSP::step()
@@ -214,9 +230,9 @@ void AICADSP::step()
 		//Shifter
 		s32 SHIFTED = 0;    //24 bit
 		if (SHIFT == 0)
-			SHIFTED = std::max<s32>(std::min<s32>(ACC, 0x007FFFFF), -0x00800000);
+			SHIFTED = std::clamp<s32>(ACC, -0x00800000, 0x007FFFFF);
 		else if (SHIFT == 1)
-			SHIFTED = std::max<s32>(std::min<s32>(ACC * 2, 0x007FFFFF), -0x00800000);
+			SHIFTED = std::clamp<s32>(ACC * 2, -0x00800000, 0x007FFFFF);
 		else if (SHIFT == 2)
 		{
 			SHIFTED = ACC * 2;
@@ -309,7 +325,7 @@ void AICADSP::step()
 //      fclose(f);
 }
 
-void AICADSP::setsample(s32 sample, u8 SEL, s32 MXL)
+void AICADSP::setsample(s32 sample, u8 SEL, s32 MXL) noexcept
 {
 	//MIXS[SEL] += sample << (MXL + 1)/*7*/;
 	MIXS[SEL] += sample;
@@ -317,13 +333,13 @@ void AICADSP::setsample(s32 sample, u8 SEL, s32 MXL)
 //      int a=1;
 }
 
-void AICADSP::start()
+void AICADSP::start() noexcept
 {
 	int i;
 	Stopped = false;
 	for (i = 127; i >= 0; --i)
 	{
-		u16 *IPtr = MPRO + i * 8;
+		u16 const *const IPtr = MPRO + i * 8;
 
 		if (IPtr[0] != 0 || IPtr[2] != 0 || IPtr[4] != 0 || IPtr[6] != 0)
 			break;

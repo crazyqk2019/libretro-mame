@@ -119,18 +119,19 @@ device_memory_interface::space_config_vector rf5c68_device::memory_space_config(
 //  sound_stream_update - handle a stream update
 //-------------------------------------------------
 
-void rf5c68_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void rf5c68_device::sound_stream_update(sound_stream &stream)
 {
-	stream_sample_t *left = outputs[0];
-	stream_sample_t *right = outputs[1];
-
-	/* start with clean buffers */
-	memset(left, 0, samples * sizeof(*left));
-	memset(right, 0, samples * sizeof(*right));
-
 	/* bail if not enabled */
 	if (!m_enable)
 		return;
+
+	if (m_mixleft.size() < stream.samples())
+		m_mixleft.resize(stream.samples());
+	if (m_mixright.size() < stream.samples())
+		m_mixright.resize(stream.samples());
+
+	std::fill_n(&m_mixleft[0], stream.samples(), 0);
+	std::fill_n(&m_mixright[0], stream.samples(), 0);
 
 	/* loop over channels */
 	for (pcm_channel &chan : m_chan)
@@ -142,7 +143,7 @@ void rf5c68_device::sound_stream_update(sound_stream &stream, stream_sample_t **
 			int rv = ((chan.pan >> 4) & 0x0f) * chan.env;
 
 			/* loop over the sample buffer */
-			for (int j = 0; j < samples; j++)
+			for (int j = 0; j < stream.samples(); j++)
 			{
 				int sample;
 
@@ -170,13 +171,13 @@ void rf5c68_device::sound_stream_update(sound_stream &stream, stream_sample_t **
 				if (sample & 0x80)
 				{
 					sample &= 0x7f;
-					left[j] += (sample * lv) >> 5;
-					right[j] += (sample * rv) >> 5;
+					m_mixleft[j] += (sample * lv) >> 5;
+					m_mixright[j] += (sample * rv) >> 5;
 				}
 				else
 				{
-					left[j] -= (sample * lv) >> 5;
-					right[j] -= (sample * rv) >> 5;
+					m_mixleft[j] -= (sample * lv) >> 5;
+					m_mixright[j] -= (sample * rv) >> 5;
 				}
 			}
 		}
@@ -188,19 +189,10 @@ void rf5c68_device::sound_stream_update(sound_stream &stream, stream_sample_t **
 	*/
 	const u8 output_shift = (m_output_bits > 16) ? 0 : (16 - m_output_bits);
 	const s32 output_nandmask = (1 << output_shift) - 1;
-	for (int j = 0; j < samples; j++)
+	for (int j = 0; j < stream.samples(); j++)
 	{
-		stream_sample_t temp;
-
-		temp = left[j];
-		if (temp > 32767) temp = 32767;
-		else if (temp < -32768) temp = -32768;
-		left[j] = temp & ~output_nandmask;
-
-		temp = right[j];
-		if (temp > 32767) temp = 32767;
-		else if (temp < -32768) temp = -32768;
-		right[j] = temp & ~output_nandmask;
+		stream.put_int_clamp(0, j, m_mixleft[j] & ~output_nandmask, 32768);
+		stream.put_int_clamp(1, j, m_mixright[j] & ~output_nandmask, 32768);
 	}
 }
 
@@ -212,10 +204,8 @@ void rf5c68_device::sound_stream_update(sound_stream &stream, stream_sample_t **
 // TODO: RF5C164 only?
 u8 rf5c68_device::rf5c68_r(offs_t offset)
 {
-	u8 shift;
-
 	m_stream->update();
-	shift = (offset & 1) ? 11 + 8 : 11;
+	u8 shift = (offset & 1) ? 11 + 8 : 11;
 
 //  printf("%08x\n",(m_chan[(offset & 0x0e) >> 1].addr));
 
@@ -225,7 +215,6 @@ u8 rf5c68_device::rf5c68_r(offs_t offset)
 void rf5c68_device::rf5c68_w(offs_t offset, u8 data)
 {
 	pcm_channel &chan = m_chan[m_cbank];
-	int i;
 
 	/* force the stream to update first */
 	m_stream->update();
@@ -272,7 +261,7 @@ void rf5c68_device::rf5c68_w(offs_t offset, u8 data)
 			break;
 
 		case 0x08:  /* channel on/off reg */
-			for (i = 0; i < 8; i++)
+			for (int i = 0; i < 8; i++)
 			{
 				m_chan[i].enable = (~data >> i) & 1;
 				if (!m_chan[i].enable)
@@ -299,5 +288,6 @@ u8 rf5c68_device::rf5c68_mem_r(offs_t offset)
 
 void rf5c68_device::rf5c68_mem_w(offs_t offset, u8 data)
 {
+	m_stream->update();
 	m_cache.write_byte(m_wbank | offset, data);
 }

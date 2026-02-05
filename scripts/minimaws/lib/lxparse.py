@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 ##
 ## license:BSD-3-Clause
 ## copyright-holders:Vas Crabb
@@ -14,7 +14,7 @@ import xml.sax.saxutils
 
 class ElementHandlerBase(object):
     def __init__(self, parent, **kwargs):
-        super(ElementHandlerBase, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.dbconn = parent.dbconn if parent is not None else None
         self.locator = parent.locator if parent is not None else None
         self.depth = 0
@@ -105,7 +105,7 @@ class ElementHandler(ElementHandlerBase):
 
 class TextAccumulator(ElementHandler):
     def __init__(self, parent, **kwargs):
-        super(TextAccumulator, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.text = ''
 
     def mainCharacters(self, content):
@@ -114,7 +114,7 @@ class TextAccumulator(ElementHandler):
 
 class DipSwitchHandler(ElementHandler):
     def __init__(self, parent, **kwargs):
-        super(DipSwitchHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = parent.dbcurs
         self.machine = parent.id
 
@@ -138,7 +138,7 @@ class DipSwitchHandler(ElementHandler):
 
 class SlotHandler(ElementHandler):
     def __init__(self, parent, **kwargs):
-        super(SlotHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = parent.dbcurs
         self.machine = parent.id
 
@@ -155,7 +155,7 @@ class SlotHandler(ElementHandler):
 
 class RamOptionHandler(TextAccumulator):
     def __init__(self, parent, **kwargs):
-        super(RamOptionHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = parent.dbcurs
         self.machine = parent.id
 
@@ -181,7 +181,7 @@ class MachineHandler(ElementHandler):
             'ramoption':        RamOptionHandler }
 
     def __init__(self, parent, **kwargs):
-        super(MachineHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = self.dbconn.cursor()
 
     def startMainElement(self, name, attrs):
@@ -248,7 +248,7 @@ class MachineHandler(ElementHandler):
 
 class ListXmlHandler(ElementHandler):
     def __init__(self, dbconn, **kwargs):
-        super(ListXmlHandler, self).__init__(parent=None, **kwargs)
+        super().__init__(parent=None, **kwargs)
         self.dbconn = dbconn
 
     def startDocument(self):
@@ -290,7 +290,7 @@ class ListXmlHandler(ElementHandler):
 
 class DataAreaHandler(ElementHandler):
     def __init__(self, parent, **kwargs):
-        super(DataAreaHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = parent.dbcurs
         self.part = parent.id
 
@@ -309,7 +309,7 @@ class DataAreaHandler(ElementHandler):
 
 class DiskAreaHandler(ElementHandler):
     def __init__(self, parent, **kwargs):
-        super(DiskAreaHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = parent.dbcurs
         self.part = parent.id
 
@@ -330,7 +330,7 @@ class SoftwarePartHandler(ElementHandler):
             'diskarea':         DiskAreaHandler }
 
     def __init__(self, parent, **kwargs):
-        super(SoftwarePartHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = parent.dbcurs
         self.software = parent.id
 
@@ -352,10 +352,11 @@ class SoftwareHandler(ElementHandler):
             'description':      TextAccumulator,
             'year':             TextAccumulator,
             'publisher':        TextAccumulator,
+            'notes':            TextAccumulator,
             'part':             SoftwarePartHandler }
 
     def __init__(self, parent, **kwargs):
-        super(SoftwareHandler, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         self.dbcurs = self.dbconn.cursor()
         self.softwarelist = parent.id
 
@@ -389,11 +390,17 @@ class SoftwareHandler(ElementHandler):
             self.id = self.dbcurs.add_software(self.softwarelist, self.shortname, self.supported, self.description, self.year, self.publisher)
             if self.cloneof is not None:
                 self.dbcurs.add_softwarecloneof(self.id, self.cloneof)
+        elif name == 'notes':
+            self.dbcurs.add_softwarenotes(self.id, handler.text)
 
 
 class SoftwareListHandler(ElementHandler):
+    CHILD_HANDLERS = {
+            'notes':            TextAccumulator,
+            'software':         SoftwareHandler }
+
     def __init__(self, dbconn, **kwargs):
-        super(SoftwareListHandler, self).__init__(parent=None, **kwargs)
+        super().__init__(parent=None, **kwargs)
         self.dbconn = dbconn
 
     def startDocument(self):
@@ -419,15 +426,20 @@ class SoftwareListHandler(ElementHandler):
         self.dbconn.commit()
 
     def startChildElement(self, name, attrs):
-        if name != 'software':
+        if name in self.CHILD_HANDLERS:
+            self.setChildHandler(name, attrs, self.CHILD_HANDLERS[name](self))
+        else:
             raise xml.sax.SAXParseException(
-                    msg=('Expected "software" element but found "%s"' % (name, )),
+                    msg=('Found unexpected element "%s"' % (name, )),
                     exception=None,
                     locator=self.locator)
-        self.setChildHandler(name, attrs, SoftwareHandler(self))
 
     def endChildHandler(self, name, handler):
-        if name == 'software':
+        if name == 'notes':
+            dbcurs = self.dbconn.cursor()
+            dbcurs.add_softwarelistnotes(self.id, handler.text)
+            dbcurs.close()
+        elif name == 'software':
             if self.entries >= 1023:
                 self.dbconn.commit()
                 self.entries = 0

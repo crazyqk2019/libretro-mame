@@ -110,22 +110,17 @@ public:
 protected:
 	// device-level overrides
 	virtual void device_config_complete() override;
-	virtual void device_start() override;
-	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	// internal callbacks
-	virtual void sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples) override;
+	virtual void sound_stream_update(sound_stream &stream) override;
+
+	TIMER_CALLBACK_MEMBER(int_tick);
+	TIMER_CALLBACK_MEMBER(efx_tick);
+	TIMER_CALLBACK_MEMBER(dma_tick);
 
 private:
-	enum
-	{
-		TIMER_INT,
-		TIMER_EFX,
-		TIMER_DMA,
-		TIMER_HSYNC
-	};
-
 	void initialize_palette();
 
 	static constexpr int bckgnd[4] = { 2, 0, 4, 1 };
@@ -152,19 +147,18 @@ private:
 	int m_disp;                     // display on
 	int m_dmaout;                   // DMA request active
 	int m_bgcolor;                  // background color
-	int m_con;                      // color on
+	bool m_con;                     // color on
 
 	// sound state
 	int m_aoe;                      // audio on
 	int m_latch;                    // sound latch
-	int16_t m_signal;                 // current signal
+	sound_stream::sample_t m_signal; // current signal
 	int m_incr;                     // initial wave state
 
 	// timers
 	emu_timer *m_int_timer;
 	emu_timer *m_efx_timer;
 	emu_timer *m_dma_timer;
-	emu_timer *m_hsync_timer;
 };
 
 

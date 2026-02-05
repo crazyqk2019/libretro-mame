@@ -9,6 +9,8 @@
 #include "emu.h"
 #include "exp.h"
 
+#include <tuple>
+
 
 
 //**************************************************************************
@@ -36,10 +38,7 @@ DEFINE_DEVICE_TYPE(CBM2_EXPANSION_SLOT, cbm2_expansion_slot_device, "cbm2_expans
 //-------------------------------------------------
 
 device_cbm2_expansion_card_interface::device_cbm2_expansion_card_interface(const machine_config &mconfig, device_t &device) :
-	device_interface(device, "cbm2exp"),
-	m_bank1(*this, "bank1"),
-	m_bank2(*this, "bank2"),
-	m_bank3(*this, "bank3")
+	device_interface(device, "cbm2exp")
 {
 	m_slot = dynamic_cast<cbm2_expansion_slot_device *>(device.owner());
 }
@@ -66,7 +65,7 @@ device_cbm2_expansion_card_interface::~device_cbm2_expansion_card_interface()
 cbm2_expansion_slot_device::cbm2_expansion_slot_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CBM2_EXPANSION_SLOT, tag, owner, clock),
 	device_single_card_slot_interface<device_cbm2_expansion_card_interface>(mconfig, *this),
-	device_image_interface(mconfig, *this),
+	device_cartrom_image_interface(mconfig, *this),
 	m_card(nullptr)
 {
 }
@@ -79,15 +78,6 @@ cbm2_expansion_slot_device::cbm2_expansion_slot_device(const machine_config &mco
 void cbm2_expansion_slot_device::device_start()
 {
 	m_card = get_card_device();
-
-	// inherit bus clock
-	// FIXME: this should be unnecessary as slots pass DERIVED_CLOCK(1, 1) through by default
-	if (clock() == 0)
-	{
-		cbm2_expansion_slot_device *root = machine().device<cbm2_expansion_slot_device>(CBM2_EXPANSION_SLOT_TAG);
-		assert(root);
-		set_unscaled_clock(root->clock());
-	}
 }
 
 
@@ -95,30 +85,41 @@ void cbm2_expansion_slot_device::device_start()
 //  call_load -
 //-------------------------------------------------
 
-image_init_result cbm2_expansion_slot_device::call_load()
+std::pair<std::error_condition, std::string> cbm2_expansion_slot_device::call_load()
 {
-	size_t size;
+	std::error_condition err;
 
 	if (m_card)
 	{
 		if (!loaded_through_softlist())
 		{
-			size = length();
+			util::core_file &file = image_core_file();
+			size_t const size = length();
 
 			if (is_filetype("20"))
 			{
-				m_card->m_bank1.allocate(size);
-				fread(m_card->m_bank1, size);
+				size_t actual;
+				std::tie(err, m_card->m_bank1, actual) = util::read(file, size);
+				if (!err && (actual != size))
+					err = std::errc::io_error;
 			}
 			else if (is_filetype("40"))
 			{
-				m_card->m_bank2.allocate(size);
-				fread(m_card->m_bank2, size);
+				size_t actual;
+				std::tie(err, m_card->m_bank2, actual) = util::read(file, size);
+				if (!err && (actual != size))
+					err = std::errc::io_error;
 			}
 			else if (is_filetype("60"))
 			{
-				m_card->m_bank3.allocate(size);
-				fread(m_card->m_bank3, size);
+				size_t actual;
+				std::tie(err, m_card->m_bank3, actual) = util::read(file, size);
+				if (!err && (actual != size))
+					err = std::errc::io_error;
+			}
+			else
+			{
+				err = image_error::INVALIDIMAGE;
 			}
 		}
 		else
@@ -129,7 +130,7 @@ image_init_result cbm2_expansion_slot_device::call_load()
 		}
 	}
 
-	return image_init_result::PASS;
+	return std::make_pair(err, std::string());
 }
 
 

@@ -14,7 +14,6 @@ You can find some *.K7 file on serveral server in France
 
 Updated 3/1/10 : use real value for timing.
 ********************************************************************/
-#include <cassert>
 
 #include "hect_tap.h"
 
@@ -24,7 +23,7 @@ Updated 3/1/10 : use real value for timing.
 #define SMPHI   32767
 
 
-static int cas_size;
+static int cas_size; // FIXME: global variable prevents multiple instances
 
 
 enum
@@ -122,7 +121,7 @@ static int hector_handle_tap(int16_t *buffer, const uint8_t *casdata)
 		if (data_pos>1)
 				previous_block = casdata[data_pos-1];
 
-		/* Handle block lenght on tape data */
+		/* Handle block length on tape data */
 		block_size = casdata[data_pos] ;
 		if (block_size==0)
 			block_size=256;
@@ -174,8 +173,8 @@ static int hector_handle_forth_tap(int16_t *buffer, const uint8_t *casdata)
 		/* Starting a block with 768 cycle of synchro*/
 		sample_count += hector_tap_synchro( buffer, sample_count, 768 );
 
-		/* Handle block lenght on tape data */
-		block_size = 822 ; /* Fixed size for the forth*/
+		/* Handle block length on tape data */
+		block_size = 822 ; /* Fixed size for the forth */
 
 		/*block_count=0;*/
 
@@ -204,7 +203,7 @@ static int hector_handle_forth_tap(int16_t *buffer, const uint8_t *casdata)
 /*******************************************************************
    Generate samples for the tape image
 ********************************************************************/
-static int hector_tap_fill_wave(int16_t *buffer, int sample_count, uint8_t *bytes)
+static int hector_tap_fill_wave(int16_t *buffer, int sample_count, const uint8_t *bytes, int)
 {
 	return hector_handle_tap( buffer, bytes );
 }
@@ -223,7 +222,7 @@ static int hector_tap_forth_to_wav_size(const uint8_t *casdata, int caslen)
 /*******************************************************************
    Generate samples for the tape image FORTH
 ********************************************************************/
-static int hector_tap_forth_fill_wave(int16_t *buffer, int sample_count, uint8_t *bytes)
+static int hector_tap_forth_fill_wave(int16_t *buffer, int sample_count, const uint8_t *bytes, int)
 {
 	return hector_handle_forth_tap( buffer, bytes ); //forth removed here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 }
@@ -240,7 +239,7 @@ static int hector_tap_to_wav_size(const uint8_t *casdata, int caslen)
 }
 
 
-static const struct CassetteLegacyWaveFiller hector_legacy_fill_wave =
+static const cassette_image::LegacyWaveFiller hector_legacy_fill_wave =
 {
 	hector_tap_fill_wave,                   /* fill_wave */
 	-1,                                     /* chunk_size */
@@ -251,7 +250,7 @@ static const struct CassetteLegacyWaveFiller hector_legacy_fill_wave =
 	0                                       /* trailer_samples */
 };
 
-static const struct CassetteLegacyWaveFiller hector_forth_legacy_fill_wave =
+static const cassette_image::LegacyWaveFiller hector_forth_legacy_fill_wave =
 {
 	hector_tap_forth_fill_wave,             /* fill_wave */
 	-1,                                     /* chunk_size */
@@ -263,30 +262,30 @@ static const struct CassetteLegacyWaveFiller hector_forth_legacy_fill_wave =
 };
 
 
-static cassette_image::error hector_k7_identify(cassette_image *cassette, struct CassetteOptions *opts)
+static cassette_image::error hector_k7_identify(cassette_image *cassette, cassette_image::Options *opts)
 {
-	return cassette_legacy_identify(cassette, opts, &hector_legacy_fill_wave);
+	return cassette->legacy_identify(opts, &hector_legacy_fill_wave);
 }
 
 
 static cassette_image::error hector_k7_load(cassette_image *cassette)
 {
-	return cassette_legacy_construct(cassette, &hector_legacy_fill_wave);
+	return cassette->legacy_construct(&hector_legacy_fill_wave);
 }
 
-static cassette_image::error hector_k7forth_identify(cassette_image *cassette, struct CassetteOptions *opts)
+static cassette_image::error hector_k7forth_identify(cassette_image *cassette, cassette_image::Options *opts)
 {
-	return cassette_legacy_identify(cassette, opts, &hector_forth_legacy_fill_wave);
+	return cassette->legacy_identify(opts, &hector_forth_legacy_fill_wave);
 }
 
 
 static cassette_image::error hector_k7forth_load(cassette_image *cassette)
 {
-	return cassette_legacy_construct(cassette, &hector_forth_legacy_fill_wave);
+	return cassette->legacy_construct(&hector_forth_legacy_fill_wave);
 }
 
 
-static const struct CassetteFormat hector_k7_format =
+static const cassette_image::Format hector_k7_format =
 {
 	"k7,cin",
 	hector_k7_identify,
@@ -294,7 +293,7 @@ static const struct CassetteFormat hector_k7_format =
 	nullptr
 };
 
-static const struct CassetteFormat hector_k7Forth_format =
+static const cassette_image::Format hector_k7Forth_format =
 {
 	"for",
 	hector_k7forth_identify,

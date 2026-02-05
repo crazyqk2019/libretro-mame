@@ -16,7 +16,7 @@
 
 #include "joyport.h"
 
-namespace bus { namespace ti99 { namespace joyport {
+namespace bus::ti99::joyport {
 
 class mecmouse_device : public device_t, public device_ti99_joyport_interface
 {
@@ -27,12 +27,17 @@ public:
 	void  write_dev(uint8_t data) override;
 
 protected:
-	virtual void device_start() override;
-	virtual void device_reset() override;
-	virtual ioport_constructor device_input_ports() const override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
+	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
+
+	TIMER_CALLBACK_MEMBER(poll_mouse);
 
 private:
+	required_ioport m_mousex;
+	required_ioport m_mousey;
+	required_ioport m_mousebutton;
+
 	int     m_last_select;
 	bool    m_read_y_axis;
 	int     m_x;
@@ -44,7 +49,8 @@ private:
 
 	emu_timer   *m_poll_timer;
 };
-} } } // end namespace bus::ti99::joyport
+
+} // end namespace bus::ti99::joyport
 
 DECLARE_DEVICE_TYPE_NS(TI99_MECMOUSE, bus::ti99::joyport, mecmouse_device)
 

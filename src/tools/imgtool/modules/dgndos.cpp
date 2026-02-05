@@ -10,12 +10,17 @@
 
 ****************************************************************************/
 
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
 #include "imgtool.h"
-#include "formats/coco_dsk.h"
+#include "filter.h"
 #include "iflopimg.h"
+
+#include "formats/coco_dsk.h"
+#include "corestr.h"
+#include "opresolv.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #ifdef _MSC_VER
 #pragma pack(push,1)
@@ -132,7 +137,7 @@ static imgtoolerr_t lookup_dgndos_file(uint8_t *entire_track, const char *fname,
 
 		fnamebuf = get_dirent_fname(ent);
 	}
-	while(core_stricmp(fnamebuf.c_str(), fname));
+	while(core_stricmp(fnamebuf, fname));
 
 	if (position)
 		*position = i - 1;
@@ -539,8 +544,8 @@ static imgtoolerr_t dgndos_diskimage_nextenum(imgtool::directory &enumeration, i
 		err = dgndos_count_dirents(entire_track20, dgnent, &dir_ent_count);
 		if (err) return err;
 
-		snprintf(ent.filename, ARRAY_LENGTH(ent.filename), "%s", fname.c_str());
-		snprintf(ent.attr, ARRAY_LENGTH(ent.attr), "%c (%03d)",
+		snprintf(ent.filename, std::size(ent.filename), "%s", fname.c_str());
+		snprintf(ent.attr, std::size(ent.attr), "%c (%03d)",
 			(char) (dgnent.flag_byte & DGNDOS_PROTECT_BIT ? 'P' : '.'),
 			dir_ent_count);
 	}
@@ -1092,7 +1097,7 @@ static imgtoolerr_t dgndos_diskimage_writefile(imgtool::partition &partition, co
 	return IMGTOOLERR_SUCCESS;
 }
 
-static imgtoolerr_t dgndos_diskimage_suggesttransfer(imgtool::partition &partition, const char *fname, imgtool_transfer_suggestion *suggestions, size_t suggestions_length)
+static imgtoolerr_t dgndos_diskimage_suggesttransfer(imgtool::partition &partition, const char *fname, imgtool::transfer_suggestion *suggestions, size_t suggestions_length)
 {
 	floperr_t ferr;
 	imgtoolerr_t err;
@@ -1114,27 +1119,27 @@ static imgtoolerr_t dgndos_diskimage_suggesttransfer(imgtool::partition &partiti
 		if (strcmp(ent.block.header.filename+8,"DAT") == 0)
 		{
 			/* ASCII file */
-			suggestions[0].viability = SUGGESTION_RECOMMENDED;
+			suggestions[0].viability = imgtool::SUGGESTION_RECOMMENDED;
 			suggestions[0].filter = filter_eoln_getinfo;
-			suggestions[1].viability = SUGGESTION_POSSIBLE;
-			suggestions[1].filter = NULL;
+			suggestions[1].viability = imgtool::SUGGESTION_POSSIBLE;
+			suggestions[1].filter = nullptr;
 		}
 		else if (strcmp(ent.block.header.filename+8,"BAS") == 0)
 		{
 			/* tokenized BASIC file */
-			suggestions[0].viability = SUGGESTION_RECOMMENDED;
-			suggestions[0].filter = NULL;
-			suggestions[1].viability = SUGGESTION_POSSIBLE;
+			suggestions[0].viability = imgtool::SUGGESTION_RECOMMENDED;
+			suggestions[0].filter = nullptr;
+			suggestions[1].viability = imgtool::SUGGESTION_POSSIBLE;
 			suggestions[1].filter = filter_dragonbas_getinfo;
 		}
 	}
 	else
 	{
-		suggestions[0].viability = SUGGESTION_RECOMMENDED;
-		suggestions[0].filter = NULL;
-		suggestions[1].viability = SUGGESTION_POSSIBLE;
+		suggestions[0].viability = imgtool::SUGGESTION_RECOMMENDED;
+		suggestions[0].filter = nullptr;
+		suggestions[1].viability = imgtool::SUGGESTION_POSSIBLE;
 		suggestions[1].filter = filter_eoln_getinfo;
-		suggestions[2].viability = SUGGESTION_POSSIBLE;
+		suggestions[2].viability = imgtool::SUGGESTION_POSSIBLE;
 		suggestions[2].filter = filter_dragonbas_getinfo;
 	}
 
@@ -1229,7 +1234,7 @@ void dgndos_get_info(const imgtool_class *imgclass, uint32_t state, union imgtoo
 		case IMGTOOLINFO_INT_PREFER_UCASE:                  info->i = 1; break;
 		case IMGTOOLINFO_INT_DIRECTORY_EXTRA_BYTES:         info->i = sizeof(struct dgndos_direnum); break;
 
-		/* --- the following bits of info are returned as NULL-terminated strings --- */
+		/* --- the following bits of info are returned as NUL-terminated strings --- */
 		case IMGTOOLINFO_STR_NAME:                          strcpy(info->s = imgtool_temp_str(), "dgndos"); break;
 		case IMGTOOLINFO_STR_DESCRIPTION:                   strcpy(info->s = imgtool_temp_str(), "Dragon DOS format"); break;
 		case IMGTOOLINFO_STR_FILE:                          strcpy(info->s = imgtool_temp_str(), __FILE__); break;

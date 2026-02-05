@@ -38,13 +38,13 @@ protected:
 	c140_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
 
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 	virtual void device_clock_changed() override;
 
-	virtual void rom_bank_updated() override;
+	virtual void rom_bank_pre_change() override;
 
 	// sound stream update overrides
-	virtual void sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples) override;
+	virtual void sound_stream_update(sound_stream &stream) override;
 
 	virtual int find_sample(int adrs, int bank, int voice);
 
@@ -79,6 +79,8 @@ protected:
 	virtual const inline bool ch_mulaw(C140_VOICE *v) { return BIT(v->mode, 3); }
 	// bit 6 used, unknown
 
+	u8 keyon_status_read(u16 offset);
+
 	TIMER_CALLBACK_MEMBER(int1_on);
 
 	devcb_write_line m_int1_callback;
@@ -92,7 +94,7 @@ protected:
 	int m_baserate;
 	u8 m_REG[0x200];
 
-	s16 m_pcmtbl[256];        //2000.06.26 CAB
+	s16 m_pcmtbl[256];
 
 	C140_VOICE m_voi[MAX_VOICE];
 
@@ -113,10 +115,10 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 	// sound stream update overrides
-	virtual void sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples) override;
+	virtual void sound_stream_update(sound_stream &stream) override;
 
 	virtual int find_sample(int adrs, int bank, int voice) override;
 

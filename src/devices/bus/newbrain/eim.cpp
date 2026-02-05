@@ -113,7 +113,7 @@ newbrain_eim_device::newbrain_eim_device(const machine_config &mconfig, const ch
 	device_newbrain_expansion_slot_interface(mconfig, *this),
 	m_ctc(*this, Z80CTC_TAG),
 	m_acia(*this, MC6850_TAG),
-	m_exp(*this, NEWBRAIN_EXPANSION_SLOT_TAG),
+	m_exp(*this, "exp"),
 	m_rom(*this, "eim"),
 	m_ram(*this, RAM_TAG)
 {
@@ -223,7 +223,7 @@ void newbrain_eim_device::anio_w(uint8_t data)
 //  adc_eoc_w -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( newbrain_eim_device::adc_eoc_w )
+void newbrain_eim_device::adc_eoc_w(int state)
 {
 	m_anint = state;
 }
@@ -233,7 +233,7 @@ WRITE_LINE_MEMBER( newbrain_eim_device::adc_eoc_w )
 //  acia_interrupt -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( newbrain_eim_device::acia_interrupt )
+void newbrain_eim_device::acia_interrupt(int state)
 {
 	m_aciaint = state;
 }
@@ -243,7 +243,7 @@ WRITE_LINE_MEMBER( newbrain_eim_device::acia_interrupt )
 //  ctc_z2_w -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( newbrain_eim_device::ctc_z2_w )
+void newbrain_eim_device::ctc_z2_w(int state)
 {
 	// connected to CTC channel 0/1 clock inputs
 	m_ctc->trg0(state);

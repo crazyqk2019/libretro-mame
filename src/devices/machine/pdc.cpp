@@ -154,8 +154,8 @@ void pdc_device::pdc_io(address_map &map)
 	map(0x21, 0x2F).rw(FUNC(pdc_device::fdd_68k_r), FUNC(pdc_device::fdd_68k_w)).mirror(0xFF00);
 	map(0x38, 0x38).r(FUNC(pdc_device::p38_r)).mirror(0xFF00); // Possibly UPD765 interrupt
 	map(0x39, 0x39).r(FUNC(pdc_device::p39_r)).mirror(0xFF00); // HDD related
-	map(0x3c, 0x3c).portr("SW2").mirror(0xFF00); /* FDC Dipswitch */
-	map(0x3d, 0x3d).portr("SW1").mirror(0xFF00); /* HDC Dipswitch */
+	map(0x3c, 0x3c).portr(m_sw2).mirror(0xFF00); /* FDC Dipswitch */
+	map(0x3d, 0x3d).portr(m_sw1).mirror(0xFF00); /* HDC Dipswitch */
 	map(0x40, 0x41).rw(HDC_TAG, FUNC(hdc9224_device::read), FUNC(hdc9224_device::write)).mirror(0xFF00);
 	map(0x42, 0x43).m(m_fdc, FUNC(upd765a_device::map)).mirror(0xFF00);
 	map(0x50, 0x5f).w(FUNC(pdc_device::p50_5f_w)).mirror(0xFF00);
@@ -244,14 +244,6 @@ static void pdc_harddisks(device_slot_interface &device)
 }
 
 //-------------------------------------------------
-//  FLOPPY_FORMATS( floppy_formats )
-//-------------------------------------------------
-
-FLOPPY_FORMATS_MEMBER( pdc_device::floppy_formats )
-	FLOPPY_PC_FORMAT
-FLOPPY_FORMATS_END
-
-//-------------------------------------------------
 //  device_add_mconfig - add device configuration
 //-------------------------------------------------
 
@@ -269,7 +261,7 @@ void pdc_device::device_add_mconfig(machine_config &config)
 	m_fdc->drq_wr_callback().set(m_dma8237, FUNC(am9517a_device::dreq0_w)); //.invert();
 
 	// Floppy disk drive
-	FLOPPY_CONNECTOR(config, FDC_TAG":0", pdc_floppies, "35hd", pdc_device::floppy_formats);
+	FLOPPY_CONNECTOR(config, FDC_TAG":0", pdc_floppies, "35hd", floppy_image_device::default_pc_floppy_formats);
 
 	/* DMA Controller - Intel P8237A-5 */
 	/* Channel 0: uPD765a Floppy Disk Controller */
@@ -312,8 +304,10 @@ pdc_device::pdc_device(const machine_config &mconfig, const char *tag, device_t 
 	m_fdc(*this, FDC_TAG),
 	m_hdc9224(*this, HDC_TAG),
 	m_pdc_ram(*this, "pdc_ram"),
-	m_m68k_r_cb(*this),
-	m_m68k_w_cb(*this)
+	m_m68k_r_cb(*this, 0),
+	m_m68k_w_cb(*this),
+	m_sw1(*this, "SW1"),
+	m_sw2(*this, "SW2")
 {
 }
 
@@ -323,10 +317,6 @@ pdc_device::pdc_device(const machine_config &mconfig, const char *tag, device_t 
 
 void pdc_device::device_start()
 {
-	/* Resolve callbacks */
-	m_m68k_r_cb.resolve_safe(0);
-	m_m68k_w_cb.resolve_safe();
-
 	/* Save States */
 	save_item(NAME(reg_p0));
 	save_item(NAME(reg_p1));

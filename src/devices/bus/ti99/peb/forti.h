@@ -20,7 +20,7 @@
 #include "sound/sn76496.h"
 #include "speaker.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 class forti_device : public device_t, public device_ti99_peribox_card_interface
 {
@@ -28,14 +28,14 @@ public:
 	forti_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 	void write(offs_t offset, uint8_t data) override;
 	void readz(offs_t offset, uint8_t *value) override;
-	void crureadz(offs_t offset, uint8_t *value) override { };
-	void cruwrite(offs_t offset, uint8_t data) override { };
+	void crureadz(offs_t offset, uint8_t *value) override { }
+	void cruwrite(offs_t offset, uint8_t data) override { }
 
-	DECLARE_WRITE_LINE_MEMBER( ready_sound );
+	void ready_sound(int state);
 
 private:
-	void device_start() override;
-	void device_reset() override;
+	void device_start() override ATTR_COLD;
+	void device_reset() override ATTR_COLD;
 	void device_add_mconfig(machine_config &config) override;
 
 	// TODO: Replace by TMS9919 when available
@@ -45,7 +45,7 @@ private:
 	required_device<sn94624_device> m_generator4;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_FORTI, bus::ti99::peb, forti_device)
 

@@ -42,13 +42,12 @@ protected:
 	z8_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, uint32_t rom_size, bool preprogrammed);
 
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	// device_execute_interface overrides
 	virtual uint32_t execute_min_cycles() const noexcept override { return 6; }
 	virtual uint32_t execute_max_cycles() const noexcept override { return 27; }
-	virtual uint32_t execute_input_lines() const noexcept override { return 4; }
 	virtual bool execute_input_edge_triggered(int inputnum) const noexcept override { return true; }
 	virtual uint64_t execute_clocks_to_cycles(uint64_t clocks) const noexcept override { return (clocks + 2 - 1) / 2; }
 	virtual uint64_t execute_cycles_to_clocks(uint64_t cycles) const noexcept override { return (cycles * 2); }
@@ -65,9 +64,9 @@ protected:
 	// device_disasm_interface overrides
 	virtual std::unique_ptr<util::disasm_interface> create_disassembler() override;
 
-	void program_map(address_map &map);
-	void preprogrammed_map(address_map &map);
-	void register_map(address_map &map);
+	void program_map(address_map &map) ATTR_COLD;
+	void preprogrammed_map(address_map &map) ATTR_COLD;
+	void register_map(address_map &map) ATTR_COLD;
 
 private:
 	address_space_config m_program_config;
@@ -428,6 +427,13 @@ protected:
 };
 
 
+class z86e02_device : public z8_device
+{
+public:
+	z86e02_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+};
+
+
 // Zilog Z8601
 DECLARE_DEVICE_TYPE(Z8601, z8601_device)
 
@@ -445,5 +451,8 @@ DECLARE_DEVICE_TYPE(Z8681, z8681_device)
 
 // Zilog Z8682 ROMless (boot to 0812H)
 DECLARE_DEVICE_TYPE(Z8682, z8682_device)
+
+// Zilog Z86E02
+DECLARE_DEVICE_TYPE(Z86E02, z86e02_device)
 
 #endif // MAME_CPU_Z8_Z8_H

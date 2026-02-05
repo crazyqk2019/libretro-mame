@@ -58,7 +58,7 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 	device_neogeo_control_port_interface *m_device;
 };
@@ -105,7 +105,7 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 	device_neogeo_ctrl_edge_interface *m_device;
 };
@@ -117,6 +117,7 @@ DECLARE_DEVICE_TYPE(NEOGEO_CTRL_EDGE_CONNECTOR, neogeo_ctrl_edge_port_device)
 
 void neogeo_controls(device_slot_interface &device);
 void neogeo_arc_edge(device_slot_interface &device);
+void neogeo_arc_edge_irrmaze(device_slot_interface &device);
 void neogeo_arc_edge_fixed(device_slot_interface &device);
 void neogeo_arc_pin15(device_slot_interface &device);
 

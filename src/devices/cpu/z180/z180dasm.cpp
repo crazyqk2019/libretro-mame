@@ -2,7 +2,6 @@
 // copyright-holders:Juergen Buchmueller
 /*****************************************************************************
  *
- *   z180dasm.c
  *   Portable Z8x180 disassembler
  *
  *****************************************************************************/
@@ -402,7 +401,7 @@ offs_t z180_disassembler::disassemble(std::ostream &stream, offs_t pc, const dat
 		if( op1 == 0xcb )
 		{
 			offset = (int8_t) params.r8(pos++);
-			op1 = params.r8(pos++); /* fourth byte from opbase.ram! */
+			op1 = opcodes.r8(pos++); // M1 fetch, unlike Z80
 			d = &mnemonic_xx_cb[op1];
 		}
 		else d = &mnemonic_xx[op1];
@@ -413,7 +412,7 @@ offs_t z180_disassembler::disassemble(std::ostream &stream, offs_t pc, const dat
 		if( op1 == 0xcb )
 		{
 			offset = (int8_t) params.r8(pos++);
-			op1 = params.r8(pos++); /* fourth byte from opbase.ram! */
+			op1 = opcodes.r8(pos++); // M1 fetch, unlike Z80
 			d = &mnemonic_xx_cb[op1];
 		}
 		else d = &mnemonic_xx[op1];
@@ -423,6 +422,7 @@ offs_t z180_disassembler::disassemble(std::ostream &stream, offs_t pc, const dat
 		break;
 	}
 
+	bool comma = false;
 	if( d->arguments )
 	{
 		util::stream_format(stream, "%-5s ", s_mnemonic[d->mnemonic]);
@@ -467,12 +467,16 @@ offs_t z180_disassembler::disassemble(std::ostream &stream, offs_t pc, const dat
 				break;
 			case 'X':
 				offset = (int8_t) params.r8(pos++);
+				[[fallthrough]];
 			case 'Y':
 				util::stream_format(stream,"(%s%c$%02x)", ixy, sign(offset), offs(offset));
 				break;
 			case 'I':
 				util::stream_format(stream, "%s", ixy);
 				break;
+			case ',':
+				comma = true;
+				[[fallthrough]];
 			default:
 				stream << *src;
 			}
@@ -484,12 +488,16 @@ offs_t z180_disassembler::disassemble(std::ostream &stream, offs_t pc, const dat
 		util::stream_format(stream, "%s", s_mnemonic[d->mnemonic]);
 	}
 
-	if (d->mnemonic == zCALL || d->mnemonic == zCPDR || d->mnemonic == zCPIR || d->mnemonic == zDJNZ ||
-		d->mnemonic == zHLT  || d->mnemonic == zINDR || d->mnemonic == zINIR || d->mnemonic == zLDDR ||
-		d->mnemonic == zLDIR || d->mnemonic == zOTDR || d->mnemonic == zOTIR || d->mnemonic == zRST)
+	if (d->mnemonic == zCALL || d->mnemonic == zHLT || d->mnemonic == zRST)
 		flags = STEP_OVER;
 	else if (d->mnemonic == zRETN || d->mnemonic == zRET || d->mnemonic == zRETI)
 		flags = STEP_OUT;
+	if (d->mnemonic == zCPDR  || d->mnemonic == zCPIR || d->mnemonic == zDJNZ  || d->mnemonic == zINDR ||
+		d->mnemonic == zINIR  || d->mnemonic == zLDDR || d->mnemonic == zLDIR  || d->mnemonic == zOTDR ||
+		d->mnemonic == zOTDMR || d->mnemonic == zOTIR || d->mnemonic == zOTIMR ||
+		((d->mnemonic == zCALL || d->mnemonic == zJP || d->mnemonic == zJR) && comma) ||
+		(d->mnemonic == zRET && d->arguments))
+		flags = STEP_COND;
 
 	return (pos - pc) | flags | SUPPORTED;
 }

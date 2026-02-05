@@ -104,26 +104,21 @@ void t6w28_device::write(offs_t offset, uint8_t data)
 //  sound_stream_update - handle a stream update
 //-------------------------------------------------
 
-void t6w28_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void t6w28_device::sound_stream_update(sound_stream &stream)
 {
-	int i;
-	stream_sample_t *buffer0 = outputs[0];
-	stream_sample_t *buffer1 = outputs[1];
-
-
 	/* If the volume is 0, increase the counter */
-	for (i = 0;i < 8;i++)
+	for (int i = 0;i < 8;i++)
 	{
 		if (m_volume[i] == 0)
 		{
 			/* note that I do count += samples, NOT count = samples + 1. You might think */
 			/* it's the same since the volume is 0, but doing the latter could cause */
 			/* interferencies when the program is rapidly modulating the volume. */
-			if (m_count[i] <= samples*STEP) m_count[i] += samples*STEP;
+			if (m_count[i] <= stream.samples()*STEP) m_count[i] += stream.samples()*STEP;
 		}
 	}
 
-	while (samples > 0)
+	for (int sampindex = 0; sampindex < stream.samples(); sampindex++)
 	{
 		int vol[8];
 		unsigned int out0, out1;
@@ -134,7 +129,7 @@ void t6w28_device::sound_stream_update(sound_stream &stream, stream_sample_t **i
 		/* in the 1 position during the sample period. */
 		vol[0] = vol[1] = vol[2] = vol[3] = vol[4] = vol[5] = vol[6] = vol[7] = 0;
 
-		for (i = 2;i < 3;i++)
+		for (int i = 2;i < 3;i++)
 		{
 			if (m_output[i]) vol[i] += m_count[i];
 			m_count[i] -= STEP;
@@ -161,7 +156,7 @@ void t6w28_device::sound_stream_update(sound_stream &stream, stream_sample_t **i
 			if (m_output[i]) vol[i] -= m_count[i];
 		}
 
-		for (i = 4;i < 7;i++)
+		for (int i = 4;i < 7;i++)
 		{
 			if (m_output[i]) vol[i] += m_count[i];
 			m_count[i] -= STEP;
@@ -252,10 +247,8 @@ void t6w28_device::sound_stream_update(sound_stream &stream, stream_sample_t **i
 		if (out0 > MAX_OUTPUT * STEP) out0 = MAX_OUTPUT * STEP;
 		if (out1 > MAX_OUTPUT * STEP) out1 = MAX_OUTPUT * STEP;
 
-		*(buffer0++) = out0 / STEP;
-		*(buffer1++) = out1 / STEP;
-
-		samples--;
+		stream.put_int(0, sampindex, out0 / STEP, 32768);
+		stream.put_int(1, sampindex, out1 / STEP, 32768);
 	}
 }
 
@@ -296,7 +289,7 @@ void t6w28_device::device_start()
 	int i;
 
 	m_sample_rate = clock() / 16;
-	m_channel = machine().sound().stream_alloc(*this, 0, 2, m_sample_rate);
+	m_channel = stream_alloc(0, 2, m_sample_rate);
 
 	for (i = 0;i < 8;i++) m_volume[i] = 0;
 

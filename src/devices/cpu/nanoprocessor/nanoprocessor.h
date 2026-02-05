@@ -50,6 +50,17 @@
 // The HP manual of Nanoprocessor is available here:
 // http://www.hp9845.net/9845/downloads/manuals/Nanoprocessor.pdf
 // Thanks to anyone who made the manual available.
+//
+// My reverse engineering of Nanoprocessor from mask set
+// https://github.com/fulivi/nanoprocessor_re
+//
+// Mask set is published here
+// http://cpushack.com/2020/08/20/hp-nanoprocessor-mask-set/
+//
+// Ken Shirriff's articles
+// http://www.righto.com/2020/09/inside-hp-nanoprocessor-high-speed.html
+// http://www.righto.com/2020/09/hp-nanoprocessor-part-ii-reverse.html
+//
 #ifndef MAME_CPU_NANOPROCESSOR_NANOPROCESSOR_H
 #define MAME_CPU_NANOPROCESSOR_NANOPROCESSOR_H
 
@@ -79,7 +90,6 @@ public:
 	virtual uint32_t execute_min_cycles() const noexcept override { return 2; }
 	// 3 cycles is for int. acknowledge + 1 instruction
 	virtual uint32_t execute_max_cycles() const noexcept override { return 3; }
-	virtual uint32_t execute_input_lines() const noexcept override { return 1; }
 	virtual uint32_t execute_default_irq_vector(int inputnum) const noexcept override { return 0xff; }
 
 	// device_memory_interface overrides
@@ -110,6 +120,11 @@ private:
 	uint16_t m_reg_ISR; // Interrupt stack register
 	uint16_t m_flags;   // Flags: extend flag (E) & direct control lines (DC0-7)
 
+	// Bits in m_flags
+	static constexpr unsigned NANO_DC0_BIT  = 0;    // DC0
+	static constexpr unsigned NANO_E_BIT    = NANO_DC0_BIT + HP_NANO_DC_NO; // Extend flag
+	static constexpr unsigned NANO_I_BIT    = NANO_E_BIT + 1;   // Interrupt flag
+
 	address_space_config m_program_config;
 	address_space_config m_io_config;
 
@@ -118,8 +133,8 @@ private:
 	memory_access< 4, 0, 0, ENDIANNESS_BIG>::specific m_io;
 
 	// device_t overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	virtual void execute_run() override;
 	virtual void execute_set_input(int linenum, int state) override;

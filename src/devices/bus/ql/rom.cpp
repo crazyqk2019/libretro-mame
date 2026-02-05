@@ -9,6 +9,8 @@
 #include "emu.h"
 #include "rom.h"
 
+#include <tuple>
+
 
 
 //**************************************************************************
@@ -29,7 +31,6 @@ DEFINE_DEVICE_TYPE(QL_ROM_CARTRIDGE_SLOT, ql_rom_cartridge_slot_device, "ql_rom_
 
 device_ql_rom_cartridge_card_interface::device_ql_rom_cartridge_card_interface(const machine_config &mconfig, device_t &device) :
 	device_interface(device, "qlrom"),
-	m_rom(*this, "rom"),
 	m_slot(dynamic_cast<ql_rom_cartridge_slot_device *>(device.owner())),
 	m_romoeh(0)
 {
@@ -63,7 +64,8 @@ void device_ql_rom_cartridge_card_interface::interface_post_start()
 ql_rom_cartridge_slot_device::ql_rom_cartridge_slot_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, QL_ROM_CARTRIDGE_SLOT, tag, owner, clock),
 	device_single_card_slot_interface<device_ql_rom_cartridge_card_interface>(mconfig, *this),
-	device_image_interface(mconfig, *this), m_card(nullptr)
+	device_cartrom_image_interface(mconfig, *this),
+	m_card(nullptr)
 {
 }
 
@@ -85,18 +87,19 @@ void ql_rom_cartridge_slot_device::device_start()
 //  call_load -
 //-------------------------------------------------
 
-image_init_result ql_rom_cartridge_slot_device::call_load()
+std::pair<std::error_condition, std::string> ql_rom_cartridge_slot_device::call_load()
 {
+	std::error_condition err;
+
 	if (m_card)
 	{
-		size_t size;
-
 		if (!loaded_through_softlist())
 		{
-			size = length();
-
-			m_card->m_rom.allocate(size);
-			fread(m_card->m_rom, size);
+			size_t const size = length();
+			size_t actual;
+			std::tie(err, m_card->m_rom, actual) = util::read(image_core_file(), size);
+			if (!err && (actual != size))
+				err = std::errc::io_error;
 		}
 		else
 		{
@@ -104,7 +107,7 @@ image_init_result ql_rom_cartridge_slot_device::call_load()
 		}
 	}
 
-	return image_init_result::PASS;
+	return std::make_pair(err, std::string());
 }
 
 

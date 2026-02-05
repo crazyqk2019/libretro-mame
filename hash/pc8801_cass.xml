@@ -1,9 +1,64 @@
 <?xml version="1.0"?>
 <!DOCTYPE softwarelist SYSTEM "softwarelist.dtd">
 <!--
-license:CC0
+license:CC0-1.0
 
 NOTE: This list is here only to document available dumps and it's not used (yet) by MAME!
+
+TODO:
+- Verify which games actually needs to be moved to separate pc8001[mk2[sr]]_cass.xml lists
+  once cassette support works for either system;
+
+Known undumped N-Basic games (excluding stuff already in pc8001_flop.xml except for collection disks):
+kanji name, romaji name, manufacturer, release date in %MMM %YY format, notes
+ヘッドオン　パート２, Head-On Part 2, Compaq, 不明, (*) (made by Geimu Kyoujin)
+スペースマウス, Space Mouse, Compaq, Oct 81, (, (*) (made by Geimu Kyoujin)
+ルナシティＳＯＳ, Lunar City SOS, Compaq, Apr 81, (*) (made by Geimu Kyoujin)
+パラシュート, Parachute, Compaq, Jul 82, (Published on マイコンゲームの本3, made by 今風太氏)
+マリンベルト, Marine Belt, Compaq, Jul 82, (*) (made by 今風太氏)
+チェックＰ, Check.P, Compaq, Jul 82, (Published on マイコンゲームの本3, made by 今風太氏)
+スペースシップ, Space Ship, Compaq, Apr 82, (Published on マイコンゲームの本２, made by 今風太氏)
+サブマリン, Sub-Marine, Compaq, Apr 82, (Published on マイコンゲームの本２, made by 今風太氏, not to be confused with "SUBMLIN" games in flop.xml)
+スペーストリップ, Space Trip, Compaq, Feb 82, (*) (made by ＴＯＴＯ氏, any relationship with "Space Trip 2"?)
+ジャックタイガー, Jack Tiger, Compaq, ??? 82,
+パックマン3, Puck Man 3, Compaq, Jul 82, (Published on マイコンゲームの本3, made by Ｙ．Ｋ氏)
+スーパー　インベーダー, Super Invaders, Tsukumo, 不明,
+スペースインベーダー, Space Invaders, 不明, 不明, (made by Ｔ．Ｋ氏)
+クレイジー　クライマー, Crazy Climber, Compaq, Dec 81, (*) (made by Ｓ．Ｉ氏)
+スターウォーズ帝国の逆襲ゲーム, Star Wars: The Empire Strikes Back, Compaq, Dec 80, (*)
+グラフィック　ＱＩＸ, Graphic QIX, Compaq, Jul 82, (Published on マイコンゲームの本3, made by Ｙ．Ｓ氏)
+カーボーイ　ゲーム, Cowboy Game, Compaq, Apr 82, (Published on マイコンゲームの本２, made by Ｈ．Ｎ氏)
+カーレース, Car Race, Tsukumo, 不明,
+スーパースペースウォー, Super Space War, Tsukumo,
+アーマーバルーン, Armor Balloon, Apollo Technica, (Made by Ｍ．Ｕ氏, Mispelled as "Armer?")
+ムービング　ブロック, Moving Block, Tsukumo, 不明,
+ドッグ　ファイト, Dog Fight, 不明, 不明, (Made by ＮＯＤＡ氏)
+ビリヤード, Billiards, 不明, 不明,
+スターファイアー, Star Fire, SystemSoft, 不明,
+バリアアタック, Barrier Attack, Micomsoft, 不明, (Made by Ａ．Ｎ氏　Ｋ．Ｍ氏　Ｍ．Ｉ氏 )
+スターダストナイト, Stardust Night, ASCII, 不明, (Made by Ｊ．Ｈ氏)
+ドラゴンメイズ, Dragon Maze, ASCII, 不明, (Made by ＮＡＣ氏)
+ザ・ナイトボンバー, The Night Bomber, なし, 不明, (Published on PiO Magazine)
+マリンウォー, Marine War, なし, Jan 85 (Made by ＤＡＲＴＨ　ＶＡＤＥＲ氏)
+ワープエイリアン, Warp Alien, なし, Jun 84 (Published on PiO Magazine, made by Ｋ．Ｏ氏)
+バクテリアランド, Bacteria Land, なし, Jun 85 (Published on PiO Magazine, made by 復活のＰＣ氏 / GANBARE8001氏)
+エイリアンプラネット, Alien Planet, Compaq, 不明, (Published on PiO Magazine, made by Ｍｉｃｒｏ　ＯＲＢ氏)
+３Ｄバトルメイズ, 3D-Battle Maze, なし, (Published on PiO Magazine, made by Ｙ．Ｓ氏)
+ベガースネーク, Begger Snake, Compaq, Jun 82 (*, made by Ｈ．Ａ氏)
+ウォーミィ, Wormy, なし, なし (Published on PiO Magazine, made by Ｙ．Ｈ氏)
+ファントムⅣ, Phantom IV, Compaq, Dec 82, (Published on マイコンゲームの本4, made by Ｋ．Ｓ氏)
+ＢＵＲＮ紫の炎, BURN Murasaki no Honoo, Compaq, Apr 82, (Published on マイコンゲームの本2, made by Ａ．Ｋ氏)
+サーキット, Circuit, Compaq, Sep 82, (*)
+スーパーモンスター, Super Monster, Compaq, Jul 82, (Published on マイコンゲームの本3, made by Ｙ．Ｎ氏)
+オセロ, Othello, Compaq, Apr 82, (Published on マイコンゲームの本2, made by Ｙ．Ｉ氏)
+ＴＨＥ悟空 , The Goku, Compaq, Dec 82, (Published on マイコンゲームの本4, made by Ｈ．Ｎ氏)
+リアルタイムアニメーションツール, Real Time Animation Tool, Compaq, 不明, (*)
+ランダムウォーカー, Random Walker, Ample Software, 不明, (also on PC8801, made by Ｍｒ　ＳＡＳＡ)
+キックバル, Kick Ball, なし, なし, (Published on PiO Magazine, also on disk? made by ＴＲＯＰＩＣＡＬ氏)
+
+(*) Published on I/O Magazine
+(**) マイコンゲームの本# is "Microcomputer Game" mag published by Kohgakusha
+
 -->
 <softwarelist name="pc8801_cass" description="NEC PC-8801 cassettes">
 
@@ -11,7 +66,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 <!-- CASSETTES -->
 
 <!-- these might be 2-sided cassettes (i.e. we should merge some parts) -->
-	<software name="pacland">
+	<software name="pacland" supported="no">
 		<description>Pac-Land</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -39,7 +94,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 
 <!-- these might be 2-sided cassettes (i.e. we should merge some parts) -->
 <!-- for 8001SR? -->
-	<software name="blckonyx">
+	<software name="blckonyxmk2" supported="no">
 		<description>The Black Onyx</description>
 		<year>1984</year>
 		<publisher>B·P·S (Bullet-Proof Software)</publisher>
@@ -58,7 +113,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="3dgolf">
+	<software name="3dgolf" supported="no">
 		<description>3D Golf Simulation</description>
 		<year>1983</year>
 		<publisher>T&amp;E Soft</publisher>
@@ -72,7 +127,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="alphos">
+	<software name="alphos" supported="no">
 		<description>Alphos</description>
 		<year>1983</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -86,8 +141,8 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="alphosa" cloneof="alphos">
-		<description>Alphos (Alt?)</description>
+	<software name="alphosa" cloneof="alphos" supported="no">
+		<description>Alphos (alt?)</description>
 		<year>1983</year>
 		<publisher>エニックス (Enix)</publisher>
 		<!-- PC8801 -->
@@ -100,7 +155,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="apploon">
+	<software name="apploon" supported="no">
 		<description>Apploon</description>
 		<year>1984</year>
 		<publisher>タカラ (Takara)</publisher>
@@ -114,7 +169,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="ay1">
+	<software name="ay1" supported="no">
 		<description>AY-1 Fortress Solomon</description>
 		<year>1983</year>
 		<publisher>アスキー (ASCII)</publisher>
@@ -127,7 +182,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="baseblk">
+	<software name="baseblk" supported="no">
 		<description>Base-kun Block</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -138,7 +193,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="bishohip">
+	<software name="bishohip" supported="no">
 		<description>Bishojo Hippagashi Game</description>
 		<year>1983</year>
 		<publisher>ツクモ (Tsukumo)</publisher>
@@ -152,7 +207,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="bokosuka">
+	<software name="bokosuka" supported="no">
 		<description>Bokosuka Wars</description>
 		<year>1984</year>
 		<publisher>アスキー (ASCII)</publisher>
@@ -166,7 +221,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="hauntcav">
+	<software name="hauntcav" supported="no">
 		<description>Haunted Cave</description>
 		<year>1984</year>
 		<publisher>ベルソフト (Bell Soft)</publisher>
@@ -180,7 +235,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="chinsnmj">
+	<software name="chinsnmj" supported="no">
 		<description>Chin-san Mahjong</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -191,7 +246,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="combat">
+	<software name="combat" supported="no">
 		<description>Combat</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -202,7 +257,21 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="cosmox">
+	<software name="ctgolf" supported="no">
+		<description>Computer the Golf</description>
+		<year>1983</year>
+		<publisher>日本ファルコム (Nihon Falcom)</publisher>
+		<!-- PC8801 -->
+		<info name="release" value="198310xx"/>
+		<info name="alt_title" value="コンピュータ ザ ゴルフ"/>
+		<part name="cass" interface="pc8801_cass">
+			<dataarea name="cass" size="23624">
+				<rom name="computer the golf.t88" size="23624" crc="a149466d" sha1="176a97e426d4b0a9fca206db249bdcb07870d24c"/>
+			</dataarea>
+		</part>
+	</software>
+
+	<software name="cosmox" supported="no">
 		<description>Cosmo Cross</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -213,7 +282,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="cosmomut">
+	<software name="cosmomu" supported="no">
 		<description>Cosmo Mutar</description>
 		<year>1984</year>
 		<publisher>T&amp;E Soft</publisher>
@@ -227,7 +296,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="cyclwman">
+	<software name="cyclwman" supported="no">
 		<description>Cyclops Crusher + Waterman</description>
 		<year>1983</year>
 		<publisher>ポニカ (Pony Canyon)</publisher>
@@ -247,7 +316,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="daifugo">
+	<software name="daifugo" supported="no">
 		<description>Daifugo</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -260,7 +329,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 	</software>
 
 	<!-- or is it the PC8001 version? -->
-	<software name="digdug">
+	<software name="digdug" supported="no">
 		<description>Dig Dug</description>
 		<year>1983</year>
 		<publisher>電波新聞社 (Dempa Shinbunsha)</publisher>
@@ -274,7 +343,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="dipper">
+	<software name="dipper" supported="no">
 		<description>Dipper</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -285,7 +354,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="donkeygo">
+	<software name="donkeygo" supported="no">
 		<description>Donkey Gorilla</description>
 		<year>1983</year>
 		<publisher>ツクモ (Tsukumo)</publisher>
@@ -298,7 +367,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="doordoor">
+	<software name="doordoor" supported="no">
 		<description>Door Door</description>
 		<year>1983</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -312,7 +381,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="doormaze">
+	<software name="doormaze" supported="no">
 		<description>Door Maze</description>
 		<year>1984</year>
 		<publisher>ポリシー (Policy)</publisher>
@@ -326,7 +395,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="downmaze">
+	<software name="downmaze" supported="no">
 		<description>Downmaze</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -337,7 +406,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="dualaln">
+	<software name="dualaln" supported="no">
 		<description>Dual Alien</description>
 		<year>1984</year>
 		<publisher>セントラル教育 (Central Kyoku)</publisher>
@@ -351,7 +420,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="dungeon">
+	<software name="dungeon" supported="no">
 		<description>Dungeon</description>
 		<year>1983</year>
 		<publisher>光栄 (Koei)</publisher>
@@ -365,7 +434,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="dungeonp">
+	<software name="dungeonp" supported="no">
 		<description>Dungeon Player Tape</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -376,7 +445,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="eggy">
+	<software name="eggy" supported="no">
 		<description>Eggy</description>
 		<year>1985</year>
 		<publisher>ボーステック (Bothtec)</publisher>
@@ -390,7 +459,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="fanfun">
+	<software name="fanfun" supported="no">
 		<description>Fan Fun</description>
 		<year>1983</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -404,7 +473,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="fanfuna" cloneof="fanfun">
+	<software name="fanfuna" cloneof="fanfun" supported="no">
 		<description>Fan Fun (alt maybe)</description>
 		<year>1983</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -418,7 +487,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="flappy">
+	<software name="flappy" supported="no">
 		<description>Flappy</description>
 		<year>1983</year>
 		<publisher>デービーソフト (dB-Soft)</publisher>
@@ -431,7 +500,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="flyingac">
+	<software name="flyingac" supported="no">
 		<description>Flying Ace</description>
 		<year>1984</year>
 		<publisher>CSKソフトウェアプロダクツ (CSK Software Products)</publisher>
@@ -445,7 +514,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="forsice">
+	<software name="forsice" supported="no">
 		<description>Forsice</description>
 		<year>1983</year>
 		<publisher>ブレーンメディア (Brain Media)</publisher>
@@ -458,7 +527,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="galaxian">
+	<software name="galaxian" supported="no">
 		<description>Galaxian</description>
 		<year>1983</year>
 		<publisher>電波新聞社 (Dempa Shinbunsha)</publisher>
@@ -472,8 +541,8 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="galaxiana" cloneof="galaxian">
-		<description>Galaxian (Alt?)</description>
+	<software name="galaxiana" cloneof="galaxian" supported="no">
+		<description>Galaxian (alt?)</description>
 		<year>1983</year>
 		<publisher>電波新聞社 (Dempa Shinbunsha)</publisher>
 		<!-- PC8801 -->
@@ -486,7 +555,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="gingasuk">
+	<software name="gingasuk" supported="no">
 		<description>Ginga wo Sukue</description>
 		<year>1984</year>
 		<publisher>日本テレネット (Nihon Telenet) / レーベンプロ (Leben Pro)</publisher>
@@ -500,8 +569,8 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="hitsuji">
-		<description>Hitsuji-Ya</description>
+	<software name="hitsuji" supported="no">
+		<description>Hitsuji Yaai</description>
 		<year>1983</year>
 		<publisher>ハドソン (Hudson Soft)</publisher>
 		<!-- PC8801 -->
@@ -514,7 +583,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="holein1">
+	<software name="holein1t" supported="no">
 		<description>Hole in One</description>
 		<year>1985</year>
 		<publisher>HAL研究所 (HAL Kenkyuujo)</publisher>
@@ -528,7 +597,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="honoyaka">
+	<software name="honoyaka" supported="no">
 		<description>Honoo no Yakata</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -539,7 +608,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="horrorho">
+	<software name="horrorho" supported="no">
 		<description>Horror House</description>
 		<year>1983</year>
 		<publisher>日本ファルコム (Nihon Falcom)</publisher>
@@ -553,7 +622,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="hosi">
+	<software name="hosi" supported="no">
 		<description>Hosi</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -564,7 +633,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="jagey">
+	<software name="jagey" supported="no">
 		<description>Jagey</description>
 		<year>1985</year>
 		<publisher>MIA</publisher>
@@ -578,7 +647,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="jelda">
+	<software name="jelda" supported="no">
 		<description>Jelda</description>
 		<year>1983</year>
 		<publisher>キャリーラボ (Carry Lab)</publisher>
@@ -592,7 +661,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="jelda2">
+	<software name="jelda2" supported="no">
 		<description>Jelda II</description>
 		<year>1984</year>
 		<publisher>キャリーラボ (Carry Lab)</publisher>
@@ -606,8 +675,8 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="jelda2a" cloneof="jelda2">
-		<description>Jelda II (Alt)</description>
+	<software name="jelda2a" cloneof="jelda2" supported="no">
+		<description>Jelda II (alt)</description>
 		<year>1984</year>
 		<publisher>キャリーラボ (Carry Lab)</publisher>
 		<!-- PC8801 -->
@@ -620,7 +689,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="juokaime">
+	<software name="juokaime" supported="no">
 		<description>Juo Kaimei - Jissen Tsugi no Isshu</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -631,7 +700,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="kabuki">
+	<software name="kabuki" supported="no">
 		<description>Kabuki Advgame</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -642,7 +711,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="kinnikum">
+	<software name="kinnikum" supported="no">
 		<description>Kinnikuman</description>
 		<year>1984</year>
 		<publisher>バンダイ (Bandai)</publisher>
@@ -656,7 +725,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="kuchusen">
+	<software name="kuchusen" supported="no">
 		<description>Kuchusen - Sky Tactics</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -667,7 +736,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="kyokiyak">
+	<software name="kyokiyak" supported="no">
 		<description>Kyoki no Yakata</description>
 		<year>1983</year>
 		<publisher>日本ファルコム (Nihon Falcom)</publisher>
@@ -681,7 +750,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="playboy">
+	<software name="playboy" supported="no">
 		<description>Love Adventure Playboy</description>
 		<year>1983</year>
 		<publisher>T&amp;E Soft</publisher>
@@ -695,7 +764,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="lunarbal">
+	<software name="lunarbal" supported="no">
 		<description>Lunar Ball</description>
 		<year>1985</year>
 		<publisher>ポニカ (Pony Canyon)</publisher>
@@ -709,7 +778,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="mariosp">
+	<software name="mariosp" supported="no">
 		<description>Mario Bros. Special</description>
 		<year>1984</year>
 		<publisher>ハドソン (Hudson Soft)</publisher>
@@ -722,7 +791,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="max01g">
+	<software name="max01g" supported="no">
 		<description>Max-01G</description>
 		<year>1985</year>
 		<publisher>ザインソフト (Sein Soft)</publisher>
@@ -736,8 +805,8 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="wakumeph">
-		<description>Star Arthur Densetsu I - Wakusei Mephius (Alt)</description>
+	<software name="wakumeph" supported="no">
+		<description>Star Arthur Densetsu I - Wakusei Mephius (alt)</description>
 		<year>1983</year>
 		<publisher>T&amp;E Soft</publisher>
 		<!-- PC8801 -->
@@ -762,7 +831,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="midmagic">
+	<software name="midmagic" supported="no">
 		<description>David's Midnight Magic</description>
 		<year>1984</year>
 		<publisher>システムソフト (System Software)</publisher>
@@ -776,7 +845,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="minami">
+	<software name="minami" supported="no">
 		<description>Minami Taihei-yo Adventure</description>
 		<year>1983</year>
 		<publisher>デービーソフト (dB-Soft)</publisher>
@@ -790,7 +859,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="moebius">
+	<software name="moebius" supported="no">
 		<description>Moebius</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -802,7 +871,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="nquest">
+	<software name="nquest" supported="no">
 		<description>N-Quest</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -813,7 +882,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="nemesis">
+	<software name="nemesis" supported="no">
 		<description>Nemesis 88</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -837,7 +906,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="newtron">
+	<software name="newtron" supported="no">
 		<description>Newtron</description>
 		<year>1984</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -851,7 +920,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="nutsmilk">
+	<software name="nutsmilk" supported="no">
 		<description>Nuts &amp; Milk</description>
 		<year>1984</year>
 		<publisher>ハドソン (Hudson Soft)</publisher>
@@ -865,7 +934,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="pacman">
+	<software name="pacmant" supported="no">
 		<description>Pacman</description>
 		<year>1983</year>
 		<publisher>電波新聞社 (Dempa Shinbunsha)</publisher>
@@ -879,7 +948,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="parallel">
+	<software name="parallel" supported="no">
 		<description>Parallel World</description>
 		<year>1984</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -893,7 +962,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="pascomtw">
+	<software name="pascomtw" supported="no">
 		<description>Pascom Tower</description>
 		<year>1985</year>
 		<publisher>MIA</publisher>
@@ -907,7 +976,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="plazmali">
+	<software name="plazmali" supported="no">
 		<description>Plazma Line</description>
 		<year>1984</year>
 		<publisher>テクノソフト (Techno Soft)</publisher>
@@ -921,7 +990,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="poibos">
+	<software name="poibos" supported="no">
 		<description>Poibos Part-1 - Dasshutsu</description>
 		<year>1983</year>
 		<publisher>大名マイコン学院 (Daimyo Micom Gakuen)</publisher>
@@ -935,7 +1004,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="ponkotsu">
+	<software name="ponkotsu" supported="no">
 		<description>Ponkotsu-sen Survival</description>
 		<year>1983</year>
 		<publisher>電波新聞社 (Dempa Shinbunsha)</publisher>
@@ -949,7 +1018,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="proyakyu">
+	<software name="proyakyu" supported="no">
 		<description>Pro Yakyu (Super Simulation)</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -960,7 +1029,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="puzzladv">
+	<software name="puzzladv" supported="no">
 		<description>Puzzle Adventure</description>
 		<year>1983</year>
 		<publisher>マイコンシティー (Micom City)</publisher>
@@ -974,7 +1043,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="river">
+	<software name="river" supported="no">
 		<description>River</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -985,7 +1054,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="rocketmn">
+	<software name="rocketmn" supported="no">
 		<description>Rocketman</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -997,7 +1066,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="shogid2">
+	<software name="shogid2" supported="no">
 		<!-- Or Igo Dojo 2? -->
 		<description>Shougi Dojo 2</description>
 		<year>19??</year>
@@ -1010,7 +1079,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="shogimei">
+	<software name="shogimei" supported="no">
 		<description>Shougi Meijin</description>
 		<year>1985</year>
 		<publisher>ソフトプロ (Soft Pro) / アポロテクニカ (Apollo Technica)</publisher>
@@ -1024,7 +1093,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="shogita2">
+	<software name="shogita2" supported="no">
 		<!-- or Igo Taikyoku V2? -->
 		<description>Shougi Taikyoku V2</description>
 		<year>1984</year>
@@ -1039,7 +1108,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="sokoban">
+	<software name="sokoban" supported="no">
 		<description>Sokouban</description>
 		<year>1983</year>
 		<publisher>シンキングラビット (Thinking Rabbit)</publisher>
@@ -1053,7 +1122,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="spacedia">
+	<software name="spacedia" supported="no">
 		<description>Space Diamond</description>
 		<year>1984</year>
 		<publisher>ボーステック (Bothtec)</publisher>
@@ -1067,7 +1136,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="spartanx">
+	<software name="spartanx" supported="no">
 		<description>Spartan X</description>
 		<year>1985</year>
 		<publisher>ポニカ (Pony Canyon)</publisher>
@@ -1081,7 +1150,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="starflet">
+	<software name="starflet" supported="no">
 		<description>Star Fleet</description>
 		<year>1983</year>
 		<publisher>テクノソフト (Techno Soft)</publisher>
@@ -1095,7 +1164,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="starques">
+	<software name="starques" supported="no">
 		<description>Star Quest</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1106,7 +1175,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="starligh">
+	<software name="starligh" supported="no">
 		<description>Starlight Adventure</description>
 		<year>1983</year>
 		<publisher>キャリーラボ (Carry Lab)</publisher>
@@ -1120,7 +1189,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="sugarfac">
+	<software name="sugarfac" supported="no">
 		<description>Sugar Factory</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1132,7 +1201,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="survival">
+	<software name="survival" supported="no">
 		<description>Survival Game</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1143,7 +1212,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="spider">
+	<software name="spider" supported="no">
 		<description>The Spider</description>
 		<year>1983</year>
 		<publisher>ハドソン (Hudson Soft)</publisher>
@@ -1157,7 +1226,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="straysto">
+	<software name="straysto" supported="no">
 		<description>The Stray Story</description>
 		<year>1984</year>
 		<publisher>ユニオンプランニング (Union Planning)</publisher>
@@ -1171,7 +1240,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="tforce">
+	<software name="tforce" supported="no">
 		<description>Thunder Force</description>
 		<year>1984</year>
 		<publisher>テクノソフト (Techno Soft)</publisher>
@@ -1185,7 +1254,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="timesecr">
+	<software name="timesecr" supported="no">
 		<description>Time Secret</description>
 		<year>1984</year>
 		<publisher>ボンドソフト (Bond Soft)</publisher>
@@ -1199,7 +1268,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="tropical">
+	<software name="tropical" supported="no">
 		<description>Tropical Boy</description>
 		<year>1983</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -1213,7 +1282,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="uchusens">
+	<software name="uchusens" supported="no">
 		<description>Uchu no Senshi</description>
 		<year>1983</year>
 		<publisher>エニックス (Enix)</publisher>
@@ -1227,7 +1296,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="ultraymj">
+	<software name="ultraymj" supported="no">
 		<description>Ultra Yonin Mahjong</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1239,7 +1308,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="univadv">
+	<software name="univadv" supported="no">
 		<description>Universal Adventure</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1250,7 +1319,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="zenon">
+	<software name="zenon" supported="no">
 		<description>Zenon</description>
 		<year>1983</year>
 		<publisher>電波新聞社 (Dempa Shinbunsha)</publisher>
@@ -1263,7 +1332,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="4dhouse">
+	<software name="4dhouset" supported="no">
 		<description>Yojigen no Ie - 4 Dimension House</description>
 		<year>1983</year>
 		<publisher>プロシューマー (Prosumer)</publisher>
@@ -1277,7 +1346,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="zexas">
+	<software name="zexas" supported="no">
 		<description>Zexas Kosoku 2000-konen</description>
 		<year>1984</year>
 		<publisher>デービーソフト (dB-Soft)</publisher>
@@ -1291,7 +1360,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="zold">
+	<software name="zold" supported="no">
 		<description>Zold</description>
 		<year>1984</year>
 		<publisher>富士音響RAM (Fuji Onkyo RAM)</publisher>
@@ -1304,7 +1373,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="zoom">
+	<software name="zoom" supported="no">
 		<description>Zoom in Space</description>
 		<year>1983</year>
 		<publisher>ユニオンプランニング (Union Planning)</publisher>
@@ -1318,7 +1387,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="cbdash">
+	<software name="cbdash" supported="no">
 		<description>Champion Boulderdash</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1329,7 +1398,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="enterpr">
+	<software name="enterpr" supported="no">
 		<description>Enterprise</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1340,7 +1409,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="intadv">
+	<software name="intadv" supported="no">
 		<description>Intern Adventure</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1351,7 +1420,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="jump">
+	<software name="jump" supported="no">
 		<description>Jump!</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1362,7 +1431,7 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		</part>
 	</software>
 
-	<software name="gundam2">
+	<software name="gundam2" supported="no">
 		<description>Kidou Senshi Gundam 2</description>
 		<year>19??</year>
 		<publisher>&lt;unknown&gt;</publisher>
@@ -1375,6 +1444,23 @@ NOTE: This list is here only to document available dumps and it's not used (yet)
 		<part name="cass2" interface="pc8801_cass">
 			<dataarea name="cass" size="74824">
 				<rom name="kido senshi gundam 2 2.t88" size="74824" crc="668c55d9" sha1="640275f3cb50a2b7d7a2e156bf1215324cef548a"/>
+			</dataarea>
+		</part>
+	</software>
+
+	<!--
+	    Originally published as a type-in program in the October 1985 issue of LOGiN Magazine.
+	    Game programmed by Hiromichi Tanaka, converted to t88 format by Dustin Hubbard / Gaming Alexandria.
+	-->
+	<software name="3156coro2" supported="no">
+		<description>3156 Coro Coro</description>
+		<year>1985</year>
+		<publisher>スクウェア (Square) / アスキー (ASCII)</publisher>
+		<info name="release" value="198510xx"/>
+		<info name="alt_title" value="サイコロコロコロ"/>
+		<part name="cass" interface="pc8801_cass">
+			<dataarea name="cass" size="39765">
+				<rom name="3156 Coro Coro.t88" size="39765" crc="fe75afd7" sha1="53416e69807eb5e24e09fbef9ee11ee52b542c56"/>
 			</dataarea>
 		</part>
 	</software>

@@ -30,8 +30,8 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	// device_comx_expansion_card_interface overrides
 	virtual uint8_t comx_mrd_r(offs_t offset, int *extrom) override;
@@ -39,7 +39,7 @@ protected:
 	virtual void comx_io_w(offs_t offset, uint8_t data) override;
 
 private:
-	optional_shared_ptr<uint8_t> m_ram;
+	memory_share_creator<uint8_t> m_ram;
 
 	int m_bank;
 };

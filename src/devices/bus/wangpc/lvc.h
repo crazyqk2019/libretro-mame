@@ -31,9 +31,9 @@ public:
 
 protected:
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
-	virtual void device_add_mconfig(machine_config &config) override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
+	virtual void device_add_mconfig(machine_config &config) override ATTR_COLD;
 
 	// device_wangpcbus_card_interface overrides
 	virtual uint16_t wangpcbus_mrdc_r(offs_t offset, uint16_t mem_mask) override;
@@ -43,12 +43,12 @@ protected:
 
 private:
 	MC6845_UPDATE_ROW( crtc_update_row );
-	DECLARE_WRITE_LINE_MEMBER( vsync_w );
+	void vsync_w(int state);
 
 	inline void set_irq(int state);
 
 	required_device<mc6845_device> m_crtc;
-	optional_shared_ptr<uint16_t> m_video_ram;
+	memory_share_creator<uint16_t> m_video_ram;
 
 	rgb_t m_palette[16];
 	uint8_t m_option;

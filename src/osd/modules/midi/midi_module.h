@@ -4,12 +4,18 @@
  * midi_module.h
  *
  */
+#ifndef MAME_OSD_MODULES_MIDI_MIDI_MODULE_H
+#define MAME_OSD_MODULES_MIDI_MIDI_MODULE_H
 
-#ifndef MIDI_MODULE_H_
-#define MIDI_MODULE_H_
+#pragma once
 
-#include "osdepend.h"
-#include "modules/osdmodule.h"
+#include "interface/midiport.h"
+
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
 
 //============================================================
 //  CONSTANTS
@@ -20,13 +26,13 @@
 class midi_module
 {
 public:
-	virtual ~midi_module() { }
+	virtual ~midi_module() = default;
+
 	// specific routines
 
-	virtual osd_midi_device *create_midi_device() = 0;
-	// FIXME: should return a list of strings ...
-	virtual void list_midi_devices(void) = 0;
+	virtual std::unique_ptr<osd::midi_input_port> create_input(std::string_view name) = 0;
+	virtual std::unique_ptr<osd::midi_output_port> create_output(std::string_view name) = 0;
+	virtual std::vector<osd::midi_port_info> list_midi_ports() = 0;
 };
 
-
-#endif /* MIDI_MODULE_H_ */
+#endif // MAME_OSD_MODULES_MIDI_MIDI_MODULE_H

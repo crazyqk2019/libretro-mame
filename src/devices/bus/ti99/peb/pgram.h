@@ -24,7 +24,7 @@
 #include "machine/74161.h"
 #include "bus/ti99/internal/buffram.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 class pgram_device : public device_t, public device_ti99_peribox_card_interface
 {
@@ -32,14 +32,14 @@ public:
 	pgram_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 	void write(offs_t offset, uint8_t data) override;
 	void readz(offs_t offset, uint8_t *value) override;
-	void crureadz(offs_t offset, uint8_t *value) override { };
+	void crureadz(offs_t offset, uint8_t *value) override { }
 	void cruwrite(offs_t offset, uint8_t data) override;
 	DECLARE_INPUT_CHANGED_MEMBER( sw1_changed );
 	DECLARE_INPUT_CHANGED_MEMBER( sw2_changed );
 
 private:
-	void device_start() override;
-	void device_reset() override;
+	void device_start() override ATTR_COLD;
+	void device_reset() override ATTR_COLD;
 	void device_add_mconfig(machine_config &config) override;
 
 	// Settings
@@ -80,7 +80,7 @@ private:
 	bool m_lowbyte;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_PGRAM, bus::ti99::peb, pgram_device)
 

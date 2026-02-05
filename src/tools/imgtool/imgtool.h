@@ -8,19 +8,19 @@
 
 ***************************************************************************/
 
-#ifndef IMGTOOL_H
-#define IMGTOOL_H
+#ifndef MAME_TOOLS_IMGTOOL_IMGTOOL_H
+#define MAME_TOOLS_IMGTOOL_IMGTOOL_H
 
-#include <cstdlib>
-#include <cstdio>
-#include <cassert>
-#include <functional>
+#pragma once
 
-#include "corestr.h"
-#include "formats/flopimg.h"
-#include "opresolv.h"
 #include "library.h"
-#include "filter.h"
+#include "stream.h"
+
+#include "osdcomm.h"
+
+#include <cassert>
+#include <cstdlib>
+#include <functional>
 
 /* ----------------------------------------------------------------------- */
 
@@ -94,7 +94,7 @@ namespace imgtool
 	public:
 		typedef std::unique_ptr<image> ptr;
 
-		image(const imgtool_module &module, object_pool *pool, void *extra_bytes);
+		image(const imgtool_module &module);
 		~image();
 
 		static imgtoolerr_t identify_file(const char *filename, imgtool_module **modules, size_t count);
@@ -114,14 +114,12 @@ namespace imgtool
 		imgtoolerr_t write_block(uint64_t block, const void *buffer);
 		imgtoolerr_t clear_block(uint64_t block, uint8_t data);
 		imgtoolerr_t list_partitions(std::vector<imgtool::partition_info> &partitions);
-		void *malloc(size_t size);
 		const imgtool_module &module() { return m_module; }
-		void *extra_bytes() { return m_extra_bytes; }
+		void *extra_bytes() { return m_extra_bytes.get(); }
 
 	private:
 		const imgtool_module &m_module;
-		object_pool *m_pool;
-		void *m_extra_bytes;
+		std::unique_ptr<uint8_t[]> m_extra_bytes;
 
 		// because of an idiosyncrasy of how imgtool::image::internal_open() works, we are only "okay to close"
 		// by invoking the module's close function once internal_open() succeeds.  the long term solution is
@@ -168,12 +166,10 @@ namespace imgtool
 		imgtoolerr_t put_file_attribute(const char *path, uint32_t attr, const imgtool_attribute &value);
 		void         get_attribute_name(uint32_t attribute, const imgtool_attribute *attr_value, char *buffer, size_t buffer_len);
 		imgtoolerr_t get_icon_info(const char *path, imgtool_iconinfo *iconinfo);
-		imgtoolerr_t suggest_file_filters(const char *path, imgtool::stream *stream, imgtool_transfer_suggestion *suggestions, size_t suggestions_length);
+		imgtoolerr_t suggest_file_filters(const char *path, imgtool::stream *stream, imgtool::transfer_suggestion *suggestions, size_t suggestions_length);
 		imgtoolerr_t get_block_size(uint32_t &length);
 		imgtoolerr_t read_block(uint64_t block, void *buffer);
 		imgtoolerr_t write_block(uint64_t block, const void *buffer);
-		imgtoolerr_t get_chain(const char *path, imgtool_chainent *chain, size_t chain_size);
-		imgtoolerr_t get_chain_string(const char *path, char *buffer, size_t buffer_len);
 		imgtool_partition_features get_features() const;
 		void *       get_info_ptr(uint32_t state);
 		const char * get_info_string(uint32_t state);
@@ -217,8 +213,7 @@ namespace imgtool
 		std::function<imgtoolerr_t(imgtool::partition &partition, const char *path, const uint32_t *attrs, const imgtool_attribute *values)> m_set_attrs;
 		std::function<imgtoolerr_t(uint32_t attribute, const imgtool_attribute *attr, char *buffer, size_t buffer_len)> m_attr_name;
 		std::function<imgtoolerr_t(imgtool::partition &partition, const char *path, imgtool_iconinfo *iconinfo)> m_get_iconinfo;
-		std::function<imgtoolerr_t(imgtool::partition &partition, const char *path, imgtool_transfer_suggestion *suggestions, size_t suggestions_length)> m_suggest_transfer;
-		std::function<imgtoolerr_t(imgtool::partition &partition, const char *path, imgtool_chainent *chain, size_t chain_size)> m_get_chain;
+		std::function<imgtoolerr_t(imgtool::partition &partition, const char *path, imgtool::transfer_suggestion *suggestions, size_t suggestions_length)> m_suggest_transfer;
 
 		const util::option_guide *m_writefile_optguide;
 		std::string m_writefile_optspec;
@@ -266,4 +261,4 @@ char *strncpyz(char *dest, const char *source, size_t len);
 void rtrim(char *buf);
 std::string extract_padded_filename(const char *source, size_t filename_length, size_t extension_length, char pad = ' ');
 
-#endif /* IMGTOOL_H */
+#endif // MAME_TOOLS_IMGTOOL_IMGTOOL_H

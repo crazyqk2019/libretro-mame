@@ -4,6 +4,9 @@
  *  Gravis Ultrasound ISA card
  *
  *  Started: 28/01/2012
+ *
+ *  to do: xref with lowsrc.doc from GUS SDK
+ *  - 256K DMA and 16-bit sample playback boundaries
  */
 
 
@@ -137,7 +140,7 @@ void gf1_device::adlib_w(offs_t offset, uint8_t data)
 	}
 }
 
-void gf1_device::update_volume_ramps()
+TIMER_CALLBACK_MEMBER(gf1_device::update_volume_ramps)
 {
 	int x;
 
@@ -204,68 +207,54 @@ void gf1_device::update_volume_ramps()
 	}
 }
 
-void gf1_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(gf1_device::adlib_timer1_tick)
 {
-	switch(id)
+	if(m_adlib_timer1_enable != 0)
 	{
-	case ADLIB_TIMER1:
-		if(m_adlib_timer1_enable != 0)
+		if(m_timer1_count == 0xff)
 		{
-			if(m_timer1_count == 0xff)
-			{
-				m_adlib_status |= 0xc0;
-				m_timer1_count = m_timer1_value;
-				if(m_timer_ctrl & 0x04)
-					m_timer1_irq_handler(1);
-			}
-			m_timer1_count++;
+			m_adlib_status |= 0xc0;
+			m_timer1_count = m_timer1_value;
+			if(m_timer_ctrl & 0x04)
+				m_timer1_irq_handler(1);
 		}
-		break;
-	case ADLIB_TIMER2:
-		if(m_adlib_timer2_enable != 0)
-		{
-			if(m_timer2_count == 0xff)
-			{
-				m_adlib_status |= 0xa0;
-				m_timer2_count = m_timer2_value;
-				if(m_timer_ctrl & 0x08)
-					m_timer2_irq_handler(1);
-			}
-			m_timer2_count++;
-		}
-		break;
-	case DMA_TIMER:
-		m_drq1_handler(1);
-		break;
-	case VOL_RAMP_TIMER:
-		update_volume_ramps();
-		break;
+		m_timer1_count++;
 	}
 }
 
-void gf1_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+TIMER_CALLBACK_MEMBER(gf1_device::adlib_timer2_tick)
 {
-	int x,y;
-	//uint32_t count;
+	if(m_adlib_timer2_enable != 0)
+	{
+		if(m_timer2_count == 0xff)
+		{
+			m_adlib_status |= 0xa0;
+			m_timer2_count = m_timer2_value;
+			if(m_timer_ctrl & 0x08)
+				m_timer2_irq_handler(1);
+		}
+		m_timer2_count++;
+	}
+}
 
-	stream_sample_t* outputl = outputs[0];
-	stream_sample_t* outputr = outputs[1];
-	memset( outputl, 0x00, samples * sizeof(*outputl) );
-	memset( outputr, 0x00, samples * sizeof(*outputr) );
+TIMER_CALLBACK_MEMBER(gf1_device::dma_tick)
+{
+	m_drq1_handler(1);
+}
+
+void gf1_device::sound_stream_update(sound_stream &stream)
+{
+	int x;
 
 	for(x=0;x<32;x++)  // for each voice
 	{
-		stream_sample_t* left = outputl;
-		stream_sample_t* right = outputr;
 		uint16_t vol = (m_volume_table[(m_voice[x].current_vol & 0xfff0) >> 4]);
-		for(y=samples-1; y>=0; y--)
+		for (int sampindex = 0; sampindex < stream.samples(); sampindex++)
 		{
 			uint32_t current = m_voice[x].current_addr >> 9;
 			// TODO: implement proper panning
-			(*left) += ((m_voice[x].sample) * (vol/8192.0));
-			(*right) += ((m_voice[x].sample) * (vol/8192.0));
-			left++;
-			right++;
+			stream.add_int(0, sampindex, m_voice[x].sample * vol, 32768 * 8192);
+			stream.add_int(1, sampindex, m_voice[x].sample * vol, 32768 * 8192);
 			if((!(m_voice[x].voice_ctrl & 0x40)) && (m_voice[x].current_addr >= m_voice[x].end_addr) && !m_voice[x].rollover && !(m_voice[x].voice_ctrl & 0x01))
 			{
 				if(m_voice[x].vol_ramp_ctrl & 0x04)
@@ -384,21 +373,6 @@ void gf1_device::device_start()
 {
 	acia6850_device::device_start();
 
-	int i;
-	double out = (double)(1 << 13);
-
-	m_txirq_handler.resolve_safe();
-	m_rxirq_handler.resolve_safe();
-	m_wave_irq_handler.resolve_safe();
-	m_ramp_irq_handler.resolve_safe();
-	m_timer1_irq_handler.resolve_safe();
-	m_timer2_irq_handler.resolve_safe();
-	m_sb_irq_handler.resolve_safe();
-	m_dma_irq_handler.resolve_safe();
-	m_drq1_handler.resolve_safe();
-	m_drq2_handler.resolve_safe();
-	m_nmi_handler.resolve_safe();
-
 	// TODO: make DRAM size configurable.  Can be 256k, 512k, 768k, or 1024k
 	m_wave_ram.resize(1024*1024);
 	memset(&m_wave_ram[0], 0, 1024*1024);
@@ -406,10 +380,10 @@ void gf1_device::device_start()
 	m_stream = stream_alloc(0,2,clock() / (14 * 16));
 
 	// init timers
-	m_timer1 = timer_alloc(ADLIB_TIMER1);
-	m_timer2 = timer_alloc(ADLIB_TIMER2);
-	m_dmatimer = timer_alloc(DMA_TIMER);
-	m_voltimer = timer_alloc(VOL_RAMP_TIMER);
+	m_timer1 = timer_alloc(FUNC(gf1_device::adlib_timer1_tick), this);
+	m_timer2 = timer_alloc(FUNC(gf1_device::adlib_timer2_tick), this);
+	m_dmatimer = timer_alloc(FUNC(gf1_device::dma_tick), this);
+	m_voltimer = timer_alloc(FUNC(gf1_device::update_volume_ramps), this);
 
 	save_item(NAME(m_wave_ram));
 
@@ -420,9 +394,10 @@ void gf1_device::device_start()
 	m_gf1_irq = 0;
 	m_midi_irq = 0;
 
-	for (i=4095;i>=0;i--)
+	double out = double(1 << 13);
+	for (int i = 4095; i >= 0; i--)
 	{
-		m_volume_table[i] = (int16_t)out;
+		m_volume_table[i] = int16_t(out);
 		out /= 1.002709201; /* 0.0235 dB Steps */
 	}
 
@@ -505,6 +480,7 @@ uint8_t gf1_device::global_reg_data_r(offs_t offset)
 			m_dma_irq_handler(0);
 			return ret;
 		}
+		break;
 	case 0x45:  // Timer control
 		if(offset == 1)
 			return m_timer_ctrl & 0x0c;
@@ -512,15 +488,18 @@ uint8_t gf1_device::global_reg_data_r(offs_t offset)
 	case 0x49:  // Sampling control
 		if(offset == 1)
 			return m_sampling_ctrl & 0xe7;
+		break;
 	case 0x4c:  // Reset
 		if(offset == 1)
 			return m_reset;
+		break;
 	case 0x80: // Voice control
 /* bit 0 - 1 if voice is stopped
  * bit 6 - 1 if addresses are decreasing, can change when looping is enabled
  * bit 7 - 1 if Wavetable IRQ is pending */
 		if(offset == 1)
 			return m_voice[m_current_voice].voice_ctrl & 0xff;
+		break;
 	case 0x81:  // Frequency Control
 		ret = m_voice[m_current_voice].freq_ctrl;
 		if(offset == 0)
@@ -554,12 +533,15 @@ uint8_t gf1_device::global_reg_data_r(offs_t offset)
 	case 0x86:  // Volume Ramp rate
 		if(offset == 1)
 			return m_voice[m_current_voice].vol_ramp_rate;
+		break;
 	case 0x87:  // Volume Ramp start (high 4 bits = exponent, low 4 bits = mantissa)
 		if(offset == 1)
 			return m_voice[m_current_voice].vol_ramp_start;
+		break;
 	case 0x88:  // Volume Ramp end (high 4 bits = exponent, low 4 bits = mantissa)
 		if(offset == 1)
 			return m_voice[m_current_voice].vol_ramp_end;
+		break;
 	case 0x89:  // Current Volume (high 4 bits = exponent, middle 8 bits = mantissa, low 4 bits = 0 [reserved])
 		ret = m_voice[m_current_voice].current_vol;
 		if(offset == 0)
@@ -581,15 +563,18 @@ uint8_t gf1_device::global_reg_data_r(offs_t offset)
 	case 0x8c:  // Pan position (4 bits, 0=full left, 15=full right)
 		if(offset == 1)
 			return m_voice[m_current_voice].pan_position;
+		break;
 	case 0x8d:  // Volume Ramp control
 /* bit 0 - Ramp has stopped
  * bit 6 - Ramp direction
  * bit 7 - Ramp IRQ pending */
 		if(offset == 1)
 			return m_voice[m_current_voice].vol_ramp_ctrl;
+		break;
 	case 0x8e:  // Active voices (6 bits, high 2 bits are always 1)
 		if(offset == 1)
 			return (m_active_voices - 1) | 0xc0;
+		break;
 	case 0x8f:  // IRQ source register
 		if(offset == 1)
 		{
@@ -713,7 +698,7 @@ void gf1_device::global_reg_data_w(offs_t offset, uint8_t data)
  * bit 2 - roll over condition (generate IRQ, and not stop playing voice, no looping)
  * bit 3 - enable looping
  * bit 4 - enable bi-directional looping
- * bit 5 - rnable IRQ at end of ramp */
+ * bit 5 - enable IRQ at end of ramp */
 		if(offset == 1)
 		{
 			m_voice[m_current_voice].vol_ramp_ctrl = data & 0x7f;
@@ -1246,11 +1231,10 @@ INPUT_PORTS_END
 
 void isa16_gus_device::device_add_mconfig(machine_config &config)
 {
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 	GGF1(config, m_gf1, GF1_CLOCK);
-	m_gf1->add_route(0, "lspeaker", 0.50);
-	m_gf1->add_route(1, "rspeaker", 0.50);
+	m_gf1->add_route(0, "speaker", 0.50, 0);
+	m_gf1->add_route(1, "speaker", 0.50, 1);
 
 	m_gf1->txd_handler().set("mdout", FUNC(midi_port_device::write_txd));
 	m_gf1->txirq_handler().set(FUNC(isa16_gus_device::midi_txirq));
@@ -1461,7 +1445,7 @@ void isa16_gus_device::joy_w(offs_t offset, uint8_t data)
 	m_joy_time = machine().time();
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::wavetable_irq)
+void isa16_gus_device::wavetable_irq(int state)
 {
 	if(state)
 		set_irq(IRQ_WAVETABLE);
@@ -1469,7 +1453,7 @@ WRITE_LINE_MEMBER(isa16_gus_device::wavetable_irq)
 		reset_irq(IRQ_WAVETABLE);
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::volumeramp_irq)
+void isa16_gus_device::volumeramp_irq(int state)
 {
 	if(state)
 		set_irq(IRQ_VOLUME_RAMP);
@@ -1477,7 +1461,7 @@ WRITE_LINE_MEMBER(isa16_gus_device::volumeramp_irq)
 		reset_irq(IRQ_VOLUME_RAMP);
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::timer1_irq)
+void isa16_gus_device::timer1_irq(int state)
 {
 	if(state)
 		set_irq(IRQ_TIMER1);
@@ -1485,7 +1469,7 @@ WRITE_LINE_MEMBER(isa16_gus_device::timer1_irq)
 		reset_irq(IRQ_TIMER1);
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::timer2_irq)
+void isa16_gus_device::timer2_irq(int state)
 {
 	if(state)
 		set_irq(IRQ_TIMER2);
@@ -1493,7 +1477,7 @@ WRITE_LINE_MEMBER(isa16_gus_device::timer2_irq)
 		reset_irq(IRQ_TIMER2);
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::dma_irq)
+void isa16_gus_device::dma_irq(int state)
 {
 	if(state)
 		set_irq(IRQ_DRAM_TC_DMA);
@@ -1501,7 +1485,7 @@ WRITE_LINE_MEMBER(isa16_gus_device::dma_irq)
 		reset_irq(IRQ_DRAM_TC_DMA);
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::sb_irq)
+void isa16_gus_device::sb_irq(int state)
 {
 	if(state)
 		set_midi_irq(IRQ_SB);
@@ -1509,7 +1493,7 @@ WRITE_LINE_MEMBER(isa16_gus_device::sb_irq)
 		reset_midi_irq(IRQ_SB);
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::drq1_w)
+void isa16_gus_device::drq1_w(int state)
 {
 	m_isa->set_dma_channel(m_gf1->dma_channel1(), this, true);
 	switch(m_gf1->dma_channel1())
@@ -1534,7 +1518,7 @@ WRITE_LINE_MEMBER(isa16_gus_device::drq1_w)
 	}
 }
 
-WRITE_LINE_MEMBER(isa16_gus_device::drq2_w)
+void isa16_gus_device::drq2_w(int state)
 {
 	m_isa->set_dma_channel(m_gf1->dma_channel2(), this, true);
 	switch(m_gf1->dma_channel2())
@@ -1683,7 +1667,7 @@ void isa16_gus_device::reset_midi_irq(uint8_t source)
 	logerror("GUS: Reset MIDI IRQ %02x\n",source);
 }
 
-WRITE_LINE_MEMBER( isa16_gus_device::midi_txirq )
+void isa16_gus_device::midi_txirq(int state)
 {
 	if (state)
 		set_midi_irq(IRQ_MIDI_TRANSMIT);
@@ -1691,7 +1675,7 @@ WRITE_LINE_MEMBER( isa16_gus_device::midi_txirq )
 		reset_midi_irq(IRQ_MIDI_TRANSMIT | IRQ_MIDI_RECEIVE);
 }
 
-WRITE_LINE_MEMBER( isa16_gus_device::midi_rxirq )
+void isa16_gus_device::midi_rxirq(int state)
 {
 	if (state)
 		set_midi_irq(IRQ_MIDI_RECEIVE);
@@ -1699,13 +1683,13 @@ WRITE_LINE_MEMBER( isa16_gus_device::midi_rxirq )
 		reset_midi_irq(IRQ_MIDI_TRANSMIT | IRQ_MIDI_RECEIVE);
 }
 
-WRITE_LINE_MEMBER( isa16_gus_device::write_acia_clock )
+void isa16_gus_device::write_acia_clock(int state)
 {
 	m_gf1->write_txc(state);
 	m_gf1->write_rxc(state);
 }
 
-WRITE_LINE_MEMBER( isa16_gus_device::nmi_w)
+void isa16_gus_device::nmi_w(int state)
 {
 	m_irq_status |= IRQ_SB;
 	m_isa->nmi();

@@ -53,7 +53,7 @@
 
     10000lmr xxxxxxxx yyyyyyyy xxxxxxxx yyyyyyyy
 
-    The Mouse systems rotatable protcol allows the host to infer
+    The Mouse systems rotatable protocol allows the host to infer
     rotation around the third axis at the cost of halving the maximum
     sustained movement speed.  The M-1 mouse has two sensors spaced 100
     counts apart horizontally.  If DIP switch 2 is on, the X and Y delta
@@ -74,30 +74,30 @@
 //  Device type globals
 //**************************************************
 
-DEFINE_DEVICE_TYPE_NS(MSFT_HLE_SERIAL_MOUSE,      bus::rs232, hle_msft_mouse_device,      "rs232_mouse_hle_msft",      "Microsoft 2-Button Serial Mouse (HLE)")
-DEFINE_DEVICE_TYPE_NS(LOGITECH_HLE_SERIAL_MOUSE,  bus::rs232, hle_logitech_mouse_device,  "rs232_mouse_hle_logitech",  "Logitech 3-Button Serial Mouse (HLE)")
-DEFINE_DEVICE_TYPE_NS(WHEEL_HLE_SERIAL_MOUSE,     bus::rs232, hle_wheel_mouse_device,     "rs232_mouse_hle_wheel",     "Microsoft Serial Mouse with Wheel (HLE)")
-DEFINE_DEVICE_TYPE_NS(MSYSTEMS_HLE_SERIAL_MOUSE,  bus::rs232, hle_msystems_mouse_device,  "rs232_mouse_hle_msystems",  "Mouse Systems Non-rotatable Mouse (HLE)")
-DEFINE_DEVICE_TYPE_NS(ROTATABLE_HLE_SERIAL_MOUSE, bus::rs232, hle_rotatable_mouse_device, "rs232_mouse_hle_rotatable", "Mouse Systems Rotatable Mouse (HLE)")
-DEFINE_DEVICE_TYPE_NS(SGI_HLE_SERIAL_MOUSE,       bus::rs232, hle_sgi_mouse_device,       "rs232_mouse_hle_sgi",       "SGI IRIS Indigo Mouse (HLE)")
+DEFINE_DEVICE_TYPE(MSFT_HLE_SERIAL_MOUSE,      bus::rs232::hle_msft_mouse_device,      "rs232_mouse_hle_msft",      "Microsoft 2-Button Serial Mouse (HLE)")
+DEFINE_DEVICE_TYPE(LOGITECH_HLE_SERIAL_MOUSE,  bus::rs232::hle_logitech_mouse_device,  "rs232_mouse_hle_logitech",  "Logitech 3-Button Serial Mouse (HLE)")
+DEFINE_DEVICE_TYPE(WHEEL_HLE_SERIAL_MOUSE,     bus::rs232::hle_wheel_mouse_device,     "rs232_mouse_hle_wheel",     "Microsoft Serial Mouse with Wheel (HLE)")
+DEFINE_DEVICE_TYPE(MSYSTEMS_HLE_SERIAL_MOUSE,  bus::rs232::hle_msystems_mouse_device,  "rs232_mouse_hle_msystems",  "Mouse Systems Non-rotatable Mouse (HLE)")
+DEFINE_DEVICE_TYPE(ROTATABLE_HLE_SERIAL_MOUSE, bus::rs232::hle_rotatable_mouse_device, "rs232_mouse_hle_rotatable", "Mouse Systems Rotatable Mouse (HLE)")
+DEFINE_DEVICE_TYPE(SGI_HLE_SERIAL_MOUSE,       bus::rs232::hle_sgi_mouse_device,       "rs232_mouse_hle_sgi",       "SGI IRIS Indigo Mouse (HLE)")
 
-namespace bus { namespace rs232 {
+namespace bus::rs232 {
 
 namespace {
 
 INPUT_PORTS_START(msft)
 	PORT_START("BTN")
 	PORT_BIT( 0xfffc, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0002, IP_ACTIVE_HIGH, IPT_BUTTON1 ) PORT_CODE(MOUSECODE_BUTTON1) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msmouse_device_base, input_changed, 0)
-	PORT_BIT( 0x0001, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msmouse_device_base, input_changed, 0)
+	PORT_BIT( 0x0002, IP_ACTIVE_HIGH, IPT_BUTTON1 ) PORT_CODE(MOUSECODE_BUTTON1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msmouse_device_base::input_changed), 0)
+	PORT_BIT( 0x0001, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msmouse_device_base::input_changed), 0)
 
 	PORT_START("X")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_X ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msmouse_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_X ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msmouse_device_base::input_changed), 0)
 
 	PORT_START("Y")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_Y ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msmouse_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_Y ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msmouse_device_base::input_changed), 0)
 INPUT_PORTS_END
 
 
@@ -105,8 +105,8 @@ INPUT_PORTS_START(logitech)
 	PORT_INCLUDE(msft)
 
 	PORT_MODIFY("BTN")
-	PORT_BIT( 0x0004, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON3) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msmouse_device_base, input_changed, 0)
-	PORT_BIT( 0x0001, IP_ACTIVE_HIGH, IPT_BUTTON3 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msmouse_device_base, input_changed, 0)
+	PORT_BIT( 0x0004, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON3) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msmouse_device_base::input_changed), 0)
+	PORT_BIT( 0x0001, IP_ACTIVE_HIGH, IPT_BUTTON3 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msmouse_device_base::input_changed), 0)
 INPUT_PORTS_END
 
 
@@ -115,24 +115,24 @@ INPUT_PORTS_START(wheel)
 
 	PORT_START("WHEEL")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_DIAL_V ) PORT_SENSITIVITY(10) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msmouse_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_DIAL_V ) PORT_SENSITIVITY(10) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msmouse_device_base::input_changed), 0)
 INPUT_PORTS_END
 
 
 INPUT_PORTS_START(msystems)
 	PORT_START("BTN")
 	PORT_BIT( 0xfff8, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_CODE(MOUSECODE_BUTTON1) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msystems_device_base, input_changed, 0)
-	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON3) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msystems_device_base, input_changed, 0)
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msystems_device_base, input_changed, 0)
+	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_CODE(MOUSECODE_BUTTON1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msystems_device_base::input_changed), 0)
+	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_CODE(MOUSECODE_BUTTON3) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msystems_device_base::input_changed), 0)
+	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_CODE(MOUSECODE_BUTTON2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msystems_device_base::input_changed), 0)
 
 	PORT_START("X")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_X ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msystems_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_X ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msystems_device_base::input_changed), 0)
 
 	PORT_START("Y")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_Y ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msystems_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_MOUSE_Y ) PORT_SENSITIVITY(100) PORT_KEYDELTA(0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msystems_device_base::input_changed), 0)
 INPUT_PORTS_END
 
 
@@ -141,7 +141,7 @@ INPUT_PORTS_START(rotatable)
 
 	PORT_START("ROT")
 	PORT_BIT( 0xf000, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x0fff, 0x00, IPT_DIAL ) PORT_SENSITIVITY(10) PORT_CHANGED_MEMBER(DEVICE_SELF, hle_msystems_device_base, input_changed, 0)
+	PORT_BIT( 0x0fff, 0x00, IPT_DIAL ) PORT_SENSITIVITY(10) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(hle_msystems_device_base::input_changed), 0)
 INPUT_PORTS_END
 
 
@@ -239,15 +239,15 @@ void hle_msmouse_device_base::device_start()
 	machine().scheduler().synchronize(timer_expired_delegate(FUNC(hle_msmouse_device_base::start_mouse), this));
 }
 
-WRITE_LINE_MEMBER(hle_msmouse_device_base::input_dtr)
+void hle_msmouse_device_base::input_dtr(int state)
 {
 	m_dtr = state ? 1U : 0U;
 	check_enable();
 }
 
-WRITE_LINE_MEMBER(hle_msmouse_device_base::input_rts)
+void hle_msmouse_device_base::input_rts(int state)
 {
-	m_dtr = state ? 1U : 0U;
+	m_rts = state ? 1U : 0U;
 	check_enable();
 }
 
@@ -720,4 +720,4 @@ void hle_sgi_mouse_device::device_start()
 	transmit_register_reset();
 }
 
-} } // namespace bus::rs232
+} // namespace bus::rs232

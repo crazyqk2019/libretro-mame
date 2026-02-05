@@ -243,13 +243,13 @@ void isa8_epc_mda_device::device_reset()
 	if (m_installed == false)
 	{
 		m_isa->install_device(0x3b0, 0x3bf, read8sm_delegate(*this, FUNC(isa8_epc_mda_device::io_read)), write8sm_delegate(*this, FUNC(isa8_epc_mda_device::io_write)));
-		m_isa->install_bank(0xb0000, 0xb7fff, "bank_epc", &m_videoram[0]); // Monochrome emulation mode VRAM address
+		m_isa->install_bank(0xb0000, 0xb7fff, &m_videoram[0]); // Monochrome emulation mode VRAM address
 
 		// This check allows a color monitor adapter to be installed at this address range if color emulation is disabled
 		if (m_color_mode & 1)
 		{
 			m_isa->install_device(0x3d0, 0x3df, read8sm_delegate(*this, FUNC(isa8_epc_mda_device::io_read)), write8sm_delegate(*this, FUNC(isa8_epc_mda_device::io_write)));
-			m_isa->install_bank(0xb8000, 0xbffff, "bank_epc", &m_videoram[0]); // Color emulation mode VRAM address, but same 32KB areas as there are only this amount on the board
+			m_isa->install_bank(0xb8000, 0xbffff, &m_videoram[0]); // Color emulation mode VRAM address, but same 32KB areas as there are only this amount on the board
 		}
 		m_installed = true;
 	}
@@ -351,13 +351,13 @@ uint8_t isa8_epc_mda_device::io_read(offs_t offset)
 	return data;
 }
 
-WRITE_LINE_MEMBER( isa8_epc_mda_device::hsync_changed )
+void isa8_epc_mda_device::hsync_changed(int state)
 {
 	m_hsync = state ? 1 : 0;
 }
 
 
-WRITE_LINE_MEMBER( isa8_epc_mda_device::vsync_changed )
+void isa8_epc_mda_device::vsync_changed(int state)
 {
 	m_vsync = state ? 0x80 : 0;
 	if ( state )
@@ -420,10 +420,6 @@ inline int isa8_epc_mda_device::get_yres()
 
 MC6845_UPDATE_ROW(isa8_epc_mda_device::crtc_update_row)
 {
-	uint32_t  *p = &bitmap.pix32(y);
-	uint16_t  chr_base = ra;
-	int i;
-
 	// Get som debug data from a couple of rows now and then
 	if ( y < (16 * 0 + 0x20) && (m_framecnt & 0xff) == 0 )
 	{
@@ -436,7 +432,7 @@ MC6845_UPDATE_ROW(isa8_epc_mda_device::crtc_update_row)
 	{
 		for (int i = 0; i < get_xres(); i++)
 		{
-			bitmap.pix32(y, i) = rgb_t::black();
+			bitmap.pix(y, i) = rgb_t::black();
 		}
 	}
 
@@ -449,14 +445,17 @@ MC6845_UPDATE_ROW(isa8_epc_mda_device::crtc_update_row)
 	// Text modes using one of two 9x16 fonts in character rom
 	else
 	{
+		uint32_t  *p = &bitmap.pix(y);
+		uint16_t  chr_base = ra;
+
 		// Adjust row pointer if in monochrome text mode as we insert two scanlines per row of characters (see below)
 		if (m_vmode & VM_MONO)
 		{
-			p = &bitmap.pix32((y / 14) * 16 + y % 14);
+			p = &bitmap.pix((y / 14) * 16 + y % 14);
 		}
 
 		// Loop over each character in a row
-		for ( i = 0; i < x_count; i++ )
+		for ( int i = 0; i < x_count; i++ )
 		{
 			uint16_t offset = ( ( ma + i ) << 1 ) & 0x0FFF;
 			uint8_t chr = m_videoram[ offset ];
@@ -555,14 +554,14 @@ MC6845_UPDATE_ROW(isa8_epc_mda_device::crtc_update_row)
 				{
 					if (chr >= 0xb3 && chr <= 0xdf) // Handle the meta graphics characters
 					{
-						bitmap.pix32(row + 1, j + i * 9) = (*m_pal)[( data & (0x80 >> j) ) || (j == 8 && (data & 0x01)) ? fg : bg];
-						bitmap.pix32(row + 2, j + i * 9) = (*m_pal)[( data & (0x80 >> j) ) || (j == 8 && (data & 0x01)) ? fg : bg];
+						bitmap.pix(row + 1, j + i * 9) = (*m_pal)[( data & (0x80 >> j) ) || (j == 8 && (data & 0x01)) ? fg : bg];
+						bitmap.pix(row + 2, j + i * 9) = (*m_pal)[( data & (0x80 >> j) ) || (j == 8 && (data & 0x01)) ? fg : bg];
 					}
 					else
 					{
 						// Handle underline
-						bitmap.pix32(row + 1, j + i * 9) =(*m_pal)[( attr & ATTR_FOREG ) == ATTR_ULINE ? fg : bg];
-						bitmap.pix32(row + 2, j + i * 9) = (*m_pal)[bg];
+						bitmap.pix(row + 1, j + i * 9) =(*m_pal)[( attr & ATTR_FOREG ) == ATTR_ULINE ? fg : bg];
+						bitmap.pix(row + 2, j + i * 9) = (*m_pal)[bg];
 					}
 				}
 			}
@@ -581,7 +580,7 @@ static INPUT_PORTS_START( epc_mda )
 	PORT_DIPUNUSED_DIPLOC(0x02, 0x02, "S1:2")
 
 	PORT_START( "MONITOR" )
-	PORT_CONFNAME( 0x01, 0x00, "Ericsson Monochrome HR Monitors") PORT_CHANGED_MEMBER( DEVICE_SELF, isa8_epc_mda_device, monitor_changed, 0 )
+	PORT_CONFNAME( 0x01, 0x00, "Ericsson Monochrome HR Monitors") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(isa8_epc_mda_device::monitor_changed), 0)
 	PORT_CONFSETTING(    0x00, "Amber 3111")
 	PORT_CONFSETTING(    0x01, "B&W 3712/3715")
 INPUT_PORTS_END

@@ -3,9 +3,6 @@
 #include "emu.h"
 #include "tms3615.h"
 
-#define VMIN    0x0000
-#define VMAX    0x7fff
-
 const int tms3615_device::divisor[TMS3615_TONES] = { 478, 451, 426, 402, 379, 358, 338, 319, 301, 284, 268, 253, 239 };
 
 
@@ -52,17 +49,16 @@ void tms3615_device::device_start()
 //  sound_stream_update - handle a stream update
 //-------------------------------------------------
 
-void tms3615_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void tms3615_device::sound_stream_update(sound_stream &stream)
 {
-	int samplerate = m_samplerate;
-	stream_sample_t *buffer8 = outputs[FOOTAGE_8];
-	stream_sample_t *buffer16 = outputs[FOOTAGE_16];
+	int samplerate = stream.sample_rate();
 
-	while( samples-- > 0 )
+	constexpr sound_stream::sample_t VMAX = 1.0f / sound_stream::sample_t(TMS3615_TONES);
+	for (int sampindex = 0; sampindex < stream.samples(); sampindex++)
 	{
-		int sum8 = 0, sum16 = 0, tone = 0;
+		sound_stream::sample_t sum8 = 0, sum16 = 0;
 
-		for (tone = 0; tone < TMS3615_TONES; tone++)
+		for (int tone = 0; tone < TMS3615_TONES; tone++)
 		{
 			// 8'
 
@@ -95,11 +91,9 @@ void tms3615_device::sound_stream_update(sound_stream &stream, stream_sample_t *
 			}
 		}
 
-		*buffer8++ = sum8 / TMS3615_TONES;
-		*buffer16++ = sum16 / TMS3615_TONES;
+		stream.put(FOOTAGE_8, sampindex, sum8);
+		stream.put(FOOTAGE_16, sampindex, sum16);
 	}
-
-	m_enable = 0;
 }
 
 

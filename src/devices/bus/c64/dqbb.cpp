@@ -53,7 +53,8 @@ c64_dqbb_cartridge_device::c64_dqbb_cartridge_device(const machine_config &mconf
 void c64_dqbb_cartridge_device::device_start()
 {
 	// allocate memory
-	m_nvram.allocate(0x4000);
+	m_nvram = std::make_unique<uint8_t[]>(0x4000);
+	save_pointer(NAME(m_nvram), 0x4000);
 
 	// state saving
 	save_item(NAME(m_cs));
@@ -71,6 +72,25 @@ void c64_dqbb_cartridge_device::device_reset()
 	m_game = 1;
 	m_cs = 0;
 	m_we = 0;
+}
+
+
+void c64_dqbb_cartridge_device::nvram_default()
+{
+}
+
+
+bool c64_dqbb_cartridge_device::nvram_read(util::read_stream &file)
+{
+	auto const [err, actual] = read(file, m_nvram.get(), 0x4000);
+	return !err && (actual == 0x4000);
+}
+
+
+bool c64_dqbb_cartridge_device::nvram_write(util::write_stream &file)
+{
+	auto const [err, actual] = write(file, m_nvram.get(), 0x4000);
+	return !err;
 }
 
 

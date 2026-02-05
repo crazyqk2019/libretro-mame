@@ -1,6 +1,6 @@
 /*
- * Copyright 2011-2019 Branimir Karadzic. All rights reserved.
- * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+ * Copyright 2011-2022 Branimir Karadzic. All rights reserved.
+ * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
 #ifndef ENTRY_PRIVATE_H_HEADER_GUARD
@@ -18,16 +18,12 @@
 #endif // ENTRY_CONFIG_USE_NOOP
 
 #ifndef ENTRY_CONFIG_USE_SDL
-#	define ENTRY_CONFIG_USE_SDL BX_PLATFORM_STEAMLINK
+#	define ENTRY_CONFIG_USE_SDL 0
 #endif // ENTRY_CONFIG_USE_SDL
 
 #ifndef ENTRY_CONFIG_USE_GLFW
 #	define ENTRY_CONFIG_USE_GLFW 0
 #endif // ENTRY_CONFIG_USE_GLFW
-
-#ifndef ENTRY_CONFIG_USE_WAYLAND
-#	define ENTRY_CONFIG_USE_WAYLAND 0
-#endif // ENTRY_CONFIG_USE_WAYLAND
 
 #if !defined(ENTRY_CONFIG_USE_NATIVE) \
 	&& !ENTRY_CONFIG_USE_NOOP \

@@ -31,7 +31,6 @@
 #include "emu.h"
 #include "dsp32.h"
 #include "dsp32dis.h"
-#include "debugger.h"
 
 
 //**************************************************************************
@@ -186,8 +185,6 @@ dsp32c_device::dsp32c_device(const machine_config &mconfig, const char *tag, dev
 
 void dsp32c_device::device_start()
 {
-	m_output_pins_changed.resolve_safe();
-
 	// get our address spaces
 	space(AS_PROGRAM).cache(m_cache);
 	space(AS_PROGRAM).specific(m_program);
@@ -195,7 +192,6 @@ void dsp32c_device::device_start()
 	// register our state for the debugger
 	state_add(STATE_GENPC,     "GENPC",     m_r[15]).noshow();
 	state_add(STATE_GENPCBASE, "CURPC",     m_ppc).noshow();
-	state_add(STATE_GENSP,     "GENSP",     m_r[21]).noshow();
 	state_add(STATE_GENFLAGS,  "GENFLAGS",  m_iotemp).callimport().callexport().formatstr("%6s").noshow();
 	state_add(DSP32_PC,        "PC",        m_r[15]).mask(0xffffff);
 	for (int regnum = 0; regnum <= 14; regnum++)
@@ -557,17 +553,6 @@ uint32_t dsp32c_device::execute_max_cycles() const noexcept
 }
 
 
-//-------------------------------------------------
-//  execute_input_lines - return the number of
-//  input/interrupt lines
-//-------------------------------------------------
-
-uint32_t dsp32c_device::execute_input_lines() const noexcept
-{
-	return 2;
-}
-
-
 void dsp32c_device::execute_set_input(int inputnum, int state)
 {
 }
@@ -578,6 +563,7 @@ void dsp32c_device::execute_run()
 	// skip if halted
 	if ((m_pcr & PCR_RESET) == 0)
 	{
+		debugger_wait_hook();
 		m_icount = 0;
 		return;
 	}

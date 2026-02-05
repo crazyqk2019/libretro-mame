@@ -14,7 +14,6 @@
 
 #include "video/ps2gif.h"
 #include "vudasm.h"
-#include "debugger.h"
 
 DEFINE_DEVICE_TYPE(SONYPS2_VU0, sonyvu0_device, "sonyvu0", "Sony PlayStation 2 VU0")
 DEFINE_DEVICE_TYPE(SONYPS2_VU1, sonyvu1_device, "sonyvu1", "Sony PlayStation 2 VU1")
@@ -996,7 +995,7 @@ void sonyvu1_device::device_start()
 
 	save_item(NAME(m_p));
 
-	state_add(SONYVU1_P, "P", *(uint32_t*)&m_p).formatstr("%17s");;
+	state_add(SONYVU1_P, "P", *(uint32_t*)&m_p).formatstr("%17s");
 }
 
 void sonyvu1_device::device_reset()

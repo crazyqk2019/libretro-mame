@@ -1,5 +1,5 @@
 // license:BSD-3-Clause
-// copyright-holders:R. Belmont, Karl Stenerud, hap
+// copyright-holders:R. Belmont, Karl Stenerud
 /*
     Mitsubishi M37702/37710/37720 CPU Emulator
 
@@ -63,17 +63,15 @@
 #include "emu.h"
 #include "m37710.h"
 
-#include "debugger.h"
 #include "m37710cm.h"
 #include "m37710il.h"
 
 // verbose logging for peripherals, etc.
-#define LOG_GENERAL (1U << 0)
 #define LOG_PORTS (1U << 1)
-#define LOG_AD (1U << 2)
-#define LOG_UART (1U << 3)
+#define LOG_AD    (1U << 2)
+#define LOG_UART  (1U << 3)
 #define LOG_TIMER (1U << 4)
-#define LOG_INT (1U << 5)
+#define LOG_INT   (1U << 5)
 //#define VERBOSE (LOG_GENERAL | LOG_PORTS | LOG_AD | LOG_UART | LOG_TIMER | LOG_INT)
 #include "logmacro.h"
 
@@ -83,6 +81,7 @@ DEFINE_DEVICE_TYPE(M37702S1, m37702s1_device, "m37702s1", "Mitsubishi M37702S1")
 DEFINE_DEVICE_TYPE(M37710S4, m37710s4_device, "m37710s4", "Mitsubishi M37710S4")
 DEFINE_DEVICE_TYPE(M37720S1, m37720s1_device, "m37720s1", "Mitsubishi M37720S1")
 DEFINE_DEVICE_TYPE(M37730S2, m37730s2_device, "m37730s2", "Mitsubishi M37730S2")
+DEFINE_DEVICE_TYPE(M37732S4, m37732s4_device, "m37732s4", "Mitsubishi M37732S4")
 
 
 // On-board RAM, ROM, and peripherals
@@ -311,15 +310,35 @@ void m37730s2_device::map(address_map &map)
 	map(0x000080, 0x00047f).ram();
 }
 
+// M37732S4: 2048 bytes internal RAM, no internal ROM
+void m37732s4_device::map(address_map &map)
+{
+	map(0x000000, 0x000001).noprw();
+	map(0x00000a, 0x00007f).noprw();
+	map(0x00000a, 0x000015).rw(FUNC(m37732s4_device::port_r<4>), FUNC(m37732s4_device::port_w<4>)).umask16(0x00ff);
+	map(0x00000a, 0x00000d).rw(FUNC(m37732s4_device::port_r<5>), FUNC(m37732s4_device::port_w<5>)).umask16(0xff00);
+	map(0x00005e, 0x00005e).rw(FUNC(m37732s4_device::proc_mode_r), FUNC(m37732s4_device::proc_mode_w));
+	map(0x000060, 0x000060).w(FUNC(m37732s4_device::watchdog_timer_w));
+	map(0x000061, 0x000061).rw(FUNC(m37732s4_device::watchdog_freq_r), FUNC(m37732s4_device::watchdog_freq_w));
+	map(0x000062, 0x000062).rw(FUNC(m37732s4_device::waveform_mode_r), FUNC(m37732s4_device::waveform_mode_w));
+	map(0x000064, 0x000065).w(FUNC(m37732s4_device::pulse_output_w));
+	ad_register_map(map);
+	uart0_register_map(map);
+	uart1_register_map(map);
+	timer_register_map(map);
+	irq_register_map(map);
+	map(0x000080, 0x00087f).ram();
+}
+
 // many other combinations of RAM and ROM size exist
 
 
 m37710_cpu_device::m37710_cpu_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, address_map_constructor map_delegate)
 	: cpu_device(mconfig, type, tag, owner, clock)
 	, m_program_config("program", ENDIANNESS_LITTLE, 16, 24, 0, map_delegate)
-	, m_port_in_cb(*this)
+	, m_port_in_cb(*this, 0xff)
 	, m_port_out_cb(*this)
-	, m_analog_cb(*this)
+	, m_analog_cb(*this, 0)
 {
 }
 
@@ -354,6 +373,11 @@ m37720s1_device::m37720s1_device(const machine_config &mconfig, const char *tag,
 
 m37730s2_device::m37730s2_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: m37710_cpu_device(mconfig, M37730S2, tag, owner, clock, address_map_constructor(FUNC(m37730s2_device::map), this))
+{
+}
+
+m37732s4_device::m37732s4_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+	: m37710_cpu_device(mconfig, M37732S4, tag, owner, clock, address_map_constructor(FUNC(m37732s4_device::map), this))
 {
 }
 
@@ -582,12 +606,12 @@ void m37710_cpu_device::set_port_dir(int p, uint8_t data)
 
 void m37710_cpu_device::da_reg_w(offs_t offset, uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "da_reg_w %x to %02X: D/A %d\n", data, (int)(offset * 2) + 0x1a, offset);
+	LOG("da_reg_w %x to %02X: D/A %d\n", data, (int)(offset * 2) + 0x1a, offset);
 }
 
 void m37710_cpu_device::pulse_output_w(offs_t offset, uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "pulse_output_w %x: Pulse output data register %d\n", data, offset);
+	LOG("pulse_output_w %x: Pulse output data register %d\n", data, offset);
 }
 
 uint8_t m37710_cpu_device::ad_control_r()
@@ -850,14 +874,14 @@ void m37710_cpu_device::timer_mode_w(offs_t offset, uint8_t data)
 
 uint8_t m37710_cpu_device::proc_mode_r(offs_t offset)
 {
-	LOGMASKED(LOG_GENERAL, "proc_mode_r: Processor mode = %x (PC=%x)\n", m_proc_mode, REG_PG | REG_PC);
+	LOG("proc_mode_r: Processor mode = %x (PC=%x)\n", m_proc_mode, REG_PG | REG_PC);
 
 	return m_proc_mode & 0xf7;
 }
 
 void m37710_cpu_device::proc_mode_w(uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "proc_mode_w %x: Processor mode = %x\n", data, m_proc_mode);
+	LOG("proc_mode_w %x: Processor mode = %x\n", data, m_proc_mode);
 
 	m_proc_mode = data;
 }
@@ -874,54 +898,54 @@ uint8_t m37710_cpu_device::watchdog_freq_r()
 
 void m37710_cpu_device::watchdog_freq_w(uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "watchdog_freq_w %x: Watchdog timer frequency = %x\n", data, m_watchdog_freq);
+	LOG("watchdog_freq_w %x: Watchdog timer frequency = %x\n", data, m_watchdog_freq);
 
 	m_watchdog_freq = data;
 }
 
 uint8_t m37710_cpu_device::waveform_mode_r()
 {
-	LOGMASKED(LOG_GENERAL, "waveform_mode_r: Waveform output mode (PC=%x)\n", REG_PG | REG_PC);
+	LOG("waveform_mode_r: Waveform output mode (PC=%x)\n", REG_PG | REG_PC);
 
 	return 0;
 }
 
 void m37710_cpu_device::waveform_mode_w(uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "waveform_mode_w %x: Waveform output mode\n", data);
+	LOG("waveform_mode_w %x: Waveform output mode\n", data);
 }
 
 uint8_t m37710_cpu_device::rto_control_r()
 {
-	LOGMASKED(LOG_GENERAL, "rto_control_r: Real-time output control = %x (PC=%x)\n", m_rto_control, REG_PG | REG_PC);
+	LOG("rto_control_r: Real-time output control = %x (PC=%x)\n", m_rto_control, REG_PG | REG_PC);
 
 	return m_rto_control;
 }
 
 void m37710_cpu_device::rto_control_w(uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "rto_control_w %x: Real-time output control = %x\n", data, m_rto_control);
+	LOG("rto_control_w %x: Real-time output control = %x\n", data, m_rto_control);
 
 	m_rto_control = data;
 }
 
 uint8_t m37710_cpu_device::dram_control_r()
 {
-	LOGMASKED(LOG_GENERAL, "dram_control_r: DRAM control = %x (PC=%x)\n", m_dram_control, REG_PG | REG_PC);
+	LOG("dram_control_r: DRAM control = %x (PC=%x)\n", m_dram_control, REG_PG | REG_PC);
 
 	return m_dram_control;
 }
 
 void m37710_cpu_device::dram_control_w(uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "dram_control_w %x: DRAM control = %x\n", data, m_dram_control);
+	LOG("dram_control_w %x: DRAM control = %x\n", data, m_dram_control);
 
 	m_dram_control = data;
 }
 
 void m37710_cpu_device::refresh_timer_w(uint8_t data)
 {
-	LOGMASKED(LOG_GENERAL, "refresh_timer_w %x: Set refresh timer\n", data);
+	LOG("refresh_timer_w %x: Set refresh timer\n", data);
 }
 
 uint16_t m37710_cpu_device::dmac_control_r(offs_t offset, uint16_t mem_mask)
@@ -931,7 +955,7 @@ uint16_t m37710_cpu_device::dmac_control_r(offs_t offset, uint16_t mem_mask)
 
 void m37710_cpu_device::dmac_control_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	LOGMASKED(LOG_GENERAL, "dmac_control_w %04x & %04x: DMAC control = %04x\n", data, mem_mask, m_dmac_control);
+	LOG("dmac_control_w %04x & %04x: DMAC control = %04x\n", data, mem_mask, m_dmac_control);
 
 	m_dmac_control = (data & mem_mask) | (m_timer_reg[offset] & ~mem_mask);
 }
@@ -1051,7 +1075,7 @@ void m37710_cpu_device::m37710i_update_irqs()
 
 	if (wantedIRQ != -1)
 	{
-		standard_irq_callback(wantedIRQ);
+		standard_irq_callback(wantedIRQ, REG_PG | REG_PC);
 
 		// make sure we're running to service the interrupt
 		CPU_STOPPED &= ~STOP_LEVEL_WAI;
@@ -1318,10 +1342,6 @@ void m37710_cpu_device::device_start()
 	space(AS_PROGRAM).cache(m_cache);
 	space(AS_PROGRAM).specific(m_program);
 
-	m_port_in_cb.resolve_all_safe(0xff);
-	m_port_out_cb.resolve_all_safe();
-	m_analog_cb.resolve_all_safe(0);
-
 	m_ICount = 0;
 
 	m_source = 0;
@@ -1329,12 +1349,12 @@ void m37710_cpu_device::device_start()
 
 	for (int i = 0; i < 8; i++)
 	{
-		m_timers[i] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(m37710_cpu_device::m37710_timer_cb), this));
+		m_timers[i] = timer_alloc(FUNC(m37710_cpu_device::m37710_timer_cb), this);
 		m_reload[i] = attotime::never;
 		m_timer_out[i] = 0;
 	}
 
-	m_ad_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(m37710_cpu_device::ad_timer_cb), this));
+	m_ad_timer = timer_alloc(FUNC(m37710_cpu_device::ad_timer_cb), this);
 
 	save_item(NAME(m_a));
 	save_item(NAME(m_b));

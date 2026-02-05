@@ -15,30 +15,37 @@
 #include "emu.h"
 #include "cartridges.h"
 
-#define LOG_WARN         (1U<<1)   // Warnings
-#define LOG_CONFIG       (1U<<2)   // Configuration
-#define LOG_CHANGE       (1U<<3)   // Cart change
-#define LOG_BANKSWITCH   (1U<<4)   // Bank switch operation
-#define LOG_CRU          (1U<<5)   // CRU access
-#define LOG_READ         (1U<<6)   // Read operation
-#define LOG_WRITE        (1U<<7)   // Write operation
-#define LOG_GROM         (1U<<8)   // GROM access
-#define LOG_RPK          (1U<<9)   // RPK handler
+#include "fileio.h"
 
-#define VERBOSE ( LOG_GENERAL | LOG_WARN )
+#include "corestr.h"
+#include "formats/rpk.h"
+
+#define LOG_WARN         (1U << 1)   // Warnings
+#define LOG_CONFIG       (1U << 2)   // Configuration
+#define LOG_CHANGE       (1U << 3)   // Cart change
+#define LOG_BANKSWITCH   (1U << 4)   // Bank switch operation
+#define LOG_CRU          (1U << 5)   // CRU access
+#define LOG_READ         (1U << 6)   // Read operation
+#define LOG_WRITE        (1U << 7)   // Write operation
+#define LOG_RPK          (1U << 8)   // RPK handler
+#define LOG_WARNW        (1U << 9)   // Warn when writing to cartridge space
+
+#define VERBOSE (LOG_GENERAL | LOG_WARN | LOG_CONFIG | LOG_CHANGE)
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(TI99_CART, bus::ti99::gromport, ti99_cartridge_device, "ti99cart", "TI-99 cartridge")
+DEFINE_DEVICE_TYPE(TI99_CART, bus::ti99::gromport::ti99_cartridge_device, "ti99cart", "TI-99 cartridge")
 
-namespace bus { namespace ti99 { namespace gromport {
+namespace bus::ti99::gromport {
 
 #define CARTGROM_TAG "grom_contents"
-#define CARTROM_TAG "rom_contents"
 #define GROM3_TAG "grom3"
 #define GROM4_TAG "grom4"
 #define GROM5_TAG "grom5"
 #define GROM6_TAG "grom6"
 #define GROM7_TAG "grom7"
+
+// Maximum RAM in a cartridge (4 banks @ 8K)
+static constexpr int MAX_RAM_SIZE = 32768;
 
 enum
 {
@@ -56,21 +63,21 @@ enum
 	PCB_PAGED7
 };
 
-static const pcb_type pcbdefs[] =
+static char const *const pcbdefs[] =
 {
-	{ PCB_STANDARD, "standard" },
-	{ PCB_PAGED12K, "paged12k" },
-	{ PCB_PAGED16K, "paged" },
-	{ PCB_MINIMEM, "minimem" },
-	{ PCB_SUPER, "super" },
-	{ PCB_MBX, "mbx" },
-	{ PCB_PAGED379I, "paged379i" },
-	{ PCB_PAGED378, "paged378" },
-	{ PCB_PAGED377, "paged377" },
-	{ PCB_PAGEDCRU, "pagedcru" },
-	{ PCB_GROMEMU, "gromemu" },
-	{ PCB_PAGED7, "paged7" },
-	{ 0, nullptr}
+	"standard",     // PCB_STANDARD
+	"paged12k",     // PCB_PAGED12K
+	"paged",        // PCB_PAGED16K
+	"minimem",      // PCB_MINIMEM
+	"super",        // PCB_SUPER
+	"mbx",          // PCB_MBX
+	"paged379i",    // PCB_PAGED379I
+	"paged378",     // PCB_PAGED378
+	"paged377",     // PCB_PAGED377
+	"pagedcru",     // PCB_PAGEDCRU
+	"gromemu",      // PCB_GROMEMU
+	"paged7",       // PCB_PAGED7
+	nullptr
 };
 
 static const pcb_type sw_pcbdefs[] =
@@ -88,106 +95,202 @@ static const pcb_type sw_pcbdefs[] =
 
 ti99_cartridge_device::ti99_cartridge_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 :   device_t(mconfig, TI99_CART, tag, owner, clock),
-	device_image_interface(mconfig, *this),
+	device_cartrom_image_interface(mconfig, *this),
 	m_pcbtype(0),
-	m_slot(0),
+	m_rom_size(0),
+	m_ram_size(0),
+	m_has_buffered_ram(false),
+	m_grom_idle(false),
+	m_grom_address(0),
+	m_rom_page(0),
+	m_ram_page(0),
+	m_romspace_selected(false),
+	m_waddr_LSB(false),
+	m_grom_selected(false),
+	m_grom_read_mode(false),
+	m_grom_address_mode(false),
 	m_pcb(nullptr),
-	m_connector(nullptr),
-	m_rpk(nullptr)
+	m_connector(nullptr)
 {
 }
 
 void ti99_cartridge_device::prepare_cartridge()
 {
-	int rom2_length;
+	int rom1_length = 0;
+	int rom2_length = 0;
 
-	uint8_t* grom_ptr;
-	uint8_t* rom_ptr;
-
+	uint8_t* gromdump_ptr;
+	uint8_t* romdump_ptr;
 	memory_region *regg;
-	memory_region *regr;
 
 	// Initialize some values.
-	m_pcb->m_rom_page = 0;
-	m_pcb->m_rom_ptr = nullptr;
-	m_pcb->m_ram_size = 0;
-	m_pcb->m_ram_ptr = nullptr;
-	m_pcb->m_ram_page = 0;
+	m_rom_page = 0;
+	m_ram_size = 0;
+	m_ram_page = 0;
+	m_rom_size = 0;
+	// Used in gromemu type
+	m_grom_address = 0;
+	m_waddr_LSB = false;
+	m_grom_selected = false;
+	m_grom_read_mode = false;
+	m_grom_address_mode = false;
 
-	for (int i=0; i < 5; i++) m_pcb->m_grom[i] = nullptr;
+	uint16_t grom_size = loaded_through_softlist() ? get_software_region_length("grom") : m_rpk->get_resource_length("grom_socket");
 
-	m_pcb->m_grom_size = loaded_through_softlist() ? get_software_region_length("grom") : m_rpk->get_resource_length("grom_socket");
-	LOGMASKED(LOG_CONFIG, "grom_socket.size=0x%04x\n", m_pcb->m_grom_size);
+	if (grom_size == 0)
+		LOGMASKED(LOG_CONFIG, "No GROM dump\n");
+	else
+		LOGMASKED(LOG_CONFIG, "GROM dump size=0x%04x\n", grom_size);
 
-	if (m_pcb->m_grom_size > 0)
+	for (int i = 0; i < 5; i++) m_grom[i] = nullptr;
+
+	if (grom_size > 0)
 	{
 		regg = memregion(CARTGROM_TAG);
-		grom_ptr = loaded_through_softlist() ? get_software_region("grom") : m_rpk->get_contents_of_socket("grom_socket");
-		memcpy(regg->base(), grom_ptr, m_pcb->m_grom_size);
+		gromdump_ptr = loaded_through_softlist() ? get_software_region("grom") : m_rpk->get_contents_of_socket("grom_socket");
+		memcpy(regg->base(), gromdump_ptr, grom_size);
 		m_pcb->m_grom_ptr = regg->base();   // for gromemu
-		m_pcb->m_grom_address = 0;          // for gromemu
 
-		// Find the GROMs and keep their pointers
-		m_pcb->set_grom_pointer(0, subdevice(GROM3_TAG));
-		if (m_pcb->m_grom_size > 0x2000) m_pcb->set_grom_pointer(1, subdevice(GROM4_TAG));
-		if (m_pcb->m_grom_size > 0x4000) m_pcb->set_grom_pointer(2, subdevice(GROM5_TAG));
-		if (m_pcb->m_grom_size > 0x6000) m_pcb->set_grom_pointer(3, subdevice(GROM6_TAG));
-		if (m_pcb->m_grom_size > 0x8000) m_pcb->set_grom_pointer(4, subdevice(GROM7_TAG));
+		// Find the GROMs and keep their pointers for fast access
+		m_grom[0]= static_cast<tmc0430_device*>(subdevice(GROM3_TAG));
+
+		if (grom_size > 0x2000)
+			m_grom[1] = static_cast<tmc0430_device*>(subdevice(GROM4_TAG));
+		if (grom_size > 0x4000)
+			m_grom[2] = static_cast<tmc0430_device*>(subdevice(GROM5_TAG));
+		if (grom_size > 0x6000)
+			m_grom[3] = static_cast<tmc0430_device*>(subdevice(GROM6_TAG));
+		if (grom_size > 0x8000)
+			m_grom[4] = static_cast<tmc0430_device*>(subdevice(GROM7_TAG));
 	}
 
-	m_pcb->m_rom_size = loaded_through_softlist() ? get_software_region_length("rom") : m_rpk->get_resource_length("rom_socket");
-	if (m_pcb->m_rom_size > 0)
+	rom1_length = loaded_through_softlist() ? get_software_region_length("rom") : m_rpk->get_resource_length("rom_socket");
+	if (rom1_length > 32*1048576)
 	{
-		if (m_pcb->m_rom_size > 0x200000) fatalerror("Cartridge ROM size exceeding 2 MiB");
-		LOGMASKED(LOG_CONFIG, "rom size=0x%04x\n", m_pcb->m_rom_size);
-		regr = memregion(CARTROM_TAG);
-		rom_ptr = loaded_through_softlist() ? get_software_region("rom") : m_rpk->get_contents_of_socket("rom_socket");
-		memcpy(regr->base(), rom_ptr, m_pcb->m_rom_size);
-		// Set both pointers to the same region for now
-		m_pcb->m_rom_ptr = regr->base();
+		LOGMASKED(LOG_WARN, "Cartridge ROM size exceeds 32 MiB; truncated.\n");
+		rom1_length = 32*1048576;
 	}
 
-	// Softlist uses only one ROM area, no second socket
-	if (!loaded_through_softlist())
+	if (rom1_length > 0)
 	{
-		rom2_length = m_rpk->get_resource_length("rom2_socket");
+		LOGMASKED(LOG_CONFIG, "ROM dump size=0x%04x\n", rom1_length);
+
+		// Round up to a power of 2, starting with 8K
+		m_rom_size = 0x2000;
+
+		while (m_rom_size < rom1_length)
+			m_rom_size <<= 1;
+
+		if (m_rom_size > rom1_length)
+			LOGMASKED(LOG_CONFIG, "ROM space size=0x%04x\n", m_rom_size);
+
+		// Softlist uses only one ROM area, no second socket
+		if (!loaded_through_softlist())
+		{
+			rom2_length = m_rpk->get_resource_length("rom2_socket");
+		}
+
+		// Using ROM2 socket automatically implies paged12, paged16,
+		// or gromemu schemes. m_rom_size is always 0x4000.
+
 		if (rom2_length > 0)
 		{
-			// sizes do not differ between rom and rom2
-			// We use the large cartrom space for the second bank as well
-			regr = memregion(CARTROM_TAG);
-			rom_ptr = m_rpk->get_contents_of_socket("rom2_socket");
-			memcpy(regr->base() + 0x2000, rom_ptr, rom2_length);
+			// These types only support two ROMs with at most 8K each
+			LOGMASKED(LOG_CONFIG, "Second ROM dump size = 0x%04x\n", rom2_length);
+
+			if (rom2_length > 0x2000)
+			{
+				LOGMASKED(LOG_WARN, "Can only use 8K for second socket; dump truncated\n");
+				rom2_length = 0x2000;
+			}
+
+			if (rom1_length > 0x2000)
+			{
+				LOGMASKED(LOG_WARN, "Can only use 8K for first socket when there is a second socket; dump truncated.\n");
+				rom1_length = 0x2000;
+			}
+
+			m_rom_size = 0x4000;
+
+			// We assign 16K for both rom1 and rom2, so this is properly
+			// aligned with the 8K spaces even when the dumps are shorter
+			m_romspace = make_unique_clear<uint8_t[]>(m_rom_size);
+
+			// Load the contents of the second socket in the upper half
+			// The contents of the first socket are copied later
+			romdump_ptr = m_rpk->get_contents_of_socket("rom2_socket");
+			memcpy(m_romspace.get() + 0x2000, romdump_ptr, rom2_length);
+
+			LOGMASKED(LOG_CONFIG, "ROM bank mask=0x0001 (using ROM1/ROM2)\n");
 		}
+		else
+		{
+			m_romspace = make_unique_clear<uint8_t[]>(m_rom_size);
+		}
+
+		romdump_ptr = loaded_through_softlist() ? get_software_region("rom") : m_rpk->get_contents_of_socket("rom_socket");
+		m_pcb->m_rom_ptr = m_romspace.get();
+
+		memcpy(m_pcb->m_rom_ptr, romdump_ptr, rom1_length);
+
+		// This is emulation magic to automatically adapt to different ROM sizes
+
+		// Each block has 8 KiB. We assume that m_rom_size is a power of 2.
+		// Thus the number of blocks is also a power of 2.
+		// To get the required number of address lines, we just have to subtract 1.
+		m_pcb->m_rom_mask = ((m_rom_size / m_pcb->get_bank_size()) - 1) & (m_pcb->get_maximum_bank_count() - 1);
+
+		if (m_pcb->get_maximum_bank_count() > 1)
+			LOGMASKED(LOG_CONFIG, "ROM bank mask=0x%04x\n", m_pcb->m_rom_mask);
+
+		if (m_rom_size > m_pcb->get_maximum_bank_count() * m_pcb->get_bank_size())
+			LOGMASKED(LOG_WARN, "WARNING: ROM dump exceeds the banking range of this cartridge type.\n");
+	}
+	else
+	{
+		LOGMASKED(LOG_CONFIG, "No ROM dump\n");
+		m_pcb->m_rom_mask = 0;
 	}
 
 	// (NV)RAM cartridges
+
+	// For state saving, we must settle on a fixed maximum size for RAM
+	// As of now, this seems to be 32K (ram or nvram)
+	m_has_buffered_ram = false;
+	m_pcb->m_ram_ptr = nullptr;
+
 	if (loaded_through_softlist())
 	{
 		// Do we have NVRAM?
 		if (get_software_region("nvram")!=nullptr)
 		{
-			m_pcb->m_ram_size = get_software_region_length("nvram");
-			m_pcb->m_nvram.resize(m_pcb->m_ram_size);
-			m_pcb->m_ram_ptr = &m_pcb->m_nvram[0];
-			battery_load(m_pcb->m_ram_ptr, m_pcb->m_ram_size, 0xff);
+			m_has_buffered_ram = true;
+			m_ram_size = get_software_region_length("nvram");
+			battery_load(m_ram.get(), m_ram_size, 0xff);
 		}
 
 		// Do we have RAM?
 		if (get_software_region("ram")!=nullptr)
 		{
-			m_pcb->m_ram_size = get_software_region_length("ram");
-			m_pcb->m_ram.resize(m_pcb->m_ram_size);
-			m_pcb->m_ram_ptr = &m_pcb->m_ram[0];
+			if (m_has_buffered_ram)
+				LOGMASKED(LOG_WARN, "Cartridge cannot use both buffered and unbuffered RAM. Ignoring the RAM entry.\n");
+			else
+				m_ram_size = get_software_region_length("ram");
 		}
 	}
 	else
 	{
-		m_pcb->m_ram_size = m_rpk->get_resource_length("ram_socket");
-		if (m_pcb->m_ram_size > 0)
+		m_ram_size = m_rpk->get_resource_length("ram_socket");
+	}
+
+	if (m_ram_size > 0)
+	{
+		m_pcb->m_ram_ptr = m_ram.get();
+		LOGMASKED(LOG_CONFIG, "%sRAM size=0x%04x\n", m_has_buffered_ram? "NV": "", m_ram_size);
+		if (m_ram_size > 32768)
 		{
-			// TODO: Consider to use a region as well. If so, do not forget to memcpy.
-			m_pcb->m_ram_ptr = m_rpk->get_contents_of_socket("ram_socket");
+			LOGMASKED(LOG_WARN, "Cartridge RAM space exceeds maximum of 32 KiB.\n");
+			m_ram_size = 32768;
 		}
 	}
 }
@@ -210,11 +313,11 @@ int ti99_cartridge_device::get_index_from_tagname()
 	return atoi(mytag+i+1)-1;
 }
 
-image_init_result ti99_cartridge_device::call_load()
+std::pair<std::error_condition, std::string> ti99_cartridge_device::call_load()
 {
 	// File name is in m_basename
-	// return true = error
-	LOGMASKED(LOG_CHANGE, "Loading %s in slot %s\n", basename());
+	int slot = get_index_from_tagname() + 1;
+	LOGMASKED(LOG_CHANGE, "Loading %s in slot %d\n", basename(), slot);
 
 	if (loaded_through_softlist())
 	{
@@ -231,23 +334,21 @@ image_init_result ti99_cartridge_device::call_load()
 			i++;
 		} while (sw_pcbdefs[i].id != 0);
 		LOGMASKED(LOG_CONFIG, "Cartridge type is %s (%d)\n", pcb, m_pcbtype);
-		m_rpk = nullptr;
+		m_rpk.reset();
 	}
 	else
 	{
-		auto reader = std::make_unique<rpk_reader>(pcbdefs);
-		try
+		util::core_file::ptr proxy;
+		std::error_condition err = util::core_file::open_proxy(image_core_file(), proxy);
+		if (!err)
+			err = rpk_open(machine().options(), std::move(proxy), machine().system().name, m_rpk);
+		if (err)
 		{
-			m_rpk = reader->open(machine().options(), filename(), machine().system().name);
-			m_pcbtype = m_rpk->get_type();
+			LOGMASKED(LOG_WARN, "Failed to load cartridge '%s': %s\n", basename(), err.message().c_str());
+			m_rpk.reset();
+			return std::make_pair(err, std::string());
 		}
-		catch (rpk_exception& err)
-		{
-			LOGMASKED(LOG_WARN, "Failed to load cartridge '%s': %s\n", basename(), err.to_string().c_str());
-			m_rpk = nullptr;
-			m_err = IMAGE_ERROR_INVALIDIMAGE;
-			return image_init_result::FAIL;
-		}
+		m_pcbtype = m_rpk->get_type();
 	}
 
 	switch (m_pcbtype)
@@ -305,9 +406,8 @@ image_init_result ti99_cartridge_device::call_load()
 	prepare_cartridge();
 	m_pcb->set_cartridge(this);
 	m_pcb->set_tag(tag());
-	m_slot = get_index_from_tagname();
-	m_connector->insert(m_slot, this);
-	return image_init_result::PASS;
+	m_connector->insert();
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 void ti99_cartridge_device::call_unload()
@@ -316,26 +416,30 @@ void ti99_cartridge_device::call_unload()
 	if (m_rpk != nullptr)
 	{
 		m_rpk->close(); // will write NVRAM contents
-		delete m_rpk;
+		m_rpk.reset();
 	}
 	else
 	{
 		// Softlist
-		bool has_nvram = (get_software_region("nvram")!=nullptr);
-		if (has_nvram)
-		{
-			int nvsize = get_software_region_length("nvram");
-			battery_save(m_pcb->m_ram_ptr, nvsize);
-		}
+		if (m_has_buffered_ram)
+			battery_save(m_ram.get(), get_software_region_length("nvram"));
 	}
 
-	m_pcb = nullptr;
-	m_connector->remove(m_slot);
-}
+	// If we don't clear this, swapping cartridges may make old contents reappear
+	if (memregion("grom"))
+		machine().memory().region_free(memregion("grom")->name());
 
-void ti99_cartridge_device::set_slot(int i)
-{
-	m_slot = i;
+	if (memregion("rom"))
+		machine().memory().region_free(memregion("rom")->name());
+
+	if (memregion("nvram"))
+		machine().memory().region_free(memregion("nvram")->name());
+
+	if (memregion("ram"))
+		machine().memory().region_free(memregion("ram")->name());
+
+	m_pcb = nullptr;
+	m_connector->remove();
 }
 
 void ti99_cartridge_device::readz(offs_t offset, uint8_t *value)
@@ -360,18 +464,14 @@ void ti99_cartridge_device::cruwrite(offs_t offset, uint8_t data)
 	if (m_pcb != nullptr) m_pcb->cruwrite(offset, data);
 }
 
-WRITE_LINE_MEMBER( ti99_cartridge_device::ready_line )
+void ti99_cartridge_device::ready_line(int state)
 {
 	m_connector->ready_line(state);
 }
 
-WRITE_LINE_MEMBER( ti99_cartridge_device::romgq_line )
+void ti99_cartridge_device::romgq_line(int state)
 {
-	if (m_pcb != nullptr)
-	{
-		m_pcb->romgq_line(state);
-		m_readrom = state;
-	}
+	m_romspace_selected = (state==ASSERT_LINE);
 }
 
 /*
@@ -379,10 +479,20 @@ WRITE_LINE_MEMBER( ti99_cartridge_device::romgq_line )
 */
 void ti99_cartridge_device::set_gromlines(line_state mline, line_state moline, line_state gsq)
 {
-	if (m_pcb != nullptr) m_pcb->set_gromlines(mline, moline, gsq);
+	if (m_pcb != nullptr)
+	{
+		if (m_pcbtype == PCB_GROMEMU)
+		{
+			m_grom_selected = (gsq == ASSERT_LINE);
+			m_grom_read_mode = (mline == ASSERT_LINE);
+			m_grom_address_mode = (moline == ASSERT_LINE);
+		}
+		else
+			m_pcb->set_gromlines(mline, moline, gsq);
+	}
 }
 
-WRITE_LINE_MEMBER(ti99_cartridge_device::gclock_in)
+void ti99_cartridge_device::gclock_in(int state)
 {
 	if (m_pcb != nullptr) m_pcb->gclock_in(state);
 }
@@ -392,9 +502,30 @@ bool ti99_cartridge_device::is_grom_idle()
 	return (m_pcb != nullptr)? m_pcb->is_grom_idle() : false;
 }
 
-void ti99_cartridge_device::device_config_complete()
+bool ti99_cartridge_device::has_ram()
 {
-	m_connector = static_cast<cartridge_connector_device*>(owner());
+	return m_ram_size > 0;
+}
+
+bool ti99_cartridge_device::has_rom()
+{
+	return m_rom_size > 0;
+}
+
+void ti99_cartridge_device::device_start()
+{
+	m_ram = make_unique_clear<uint8_t[]>(MAX_RAM_SIZE);
+
+	save_item(NAME(m_grom_idle));
+	save_item(NAME(m_grom_address));
+	save_item(NAME(m_rom_page));
+	save_item(NAME(m_ram_page));
+	save_item(NAME(m_romspace_selected));
+	save_item(NAME(m_waddr_LSB));
+	save_item(NAME(m_grom_selected));
+	save_item(NAME(m_grom_read_mode));
+	save_item(NAME(m_grom_address_mode));
+	save_pointer(NAME(m_ram), MAX_RAM_SIZE);
 }
 
 /*
@@ -410,13 +541,12 @@ void ti99_cartridge_device::device_add_mconfig(machine_config& config)
 }
 
 /*
-    Memory area for one cartridge. For most cartridges we only need 8 KiB for
-    ROM contents, but cartridges of the "paged377" type have up to 2 MiB
-    organised as selectable banks, so we must be sure there is enough space.
+    Memory area for one cartridge. This only covers the GROM area, since we
+    assign portions of the memory to subdevices (TMC0430). For the ROM area,
+    we use a dynamically allocated space, since the sizes vary strongly.
 */
 ROM_START( cartridge_memory )
 	ROM_REGION(0xa000, CARTGROM_TAG, ROMREGION_ERASE00)
-	ROM_REGION(0x200000, CARTROM_TAG, ROMREGION_ERASE00)
 ROM_END
 
 const tiny_rom_entry *ti99_cartridge_device::device_rom_region() const
@@ -446,17 +576,8 @@ const tiny_rom_entry *ti99_cartridge_device::device_rom_region() const
 
 ti99_cartridge_pcb::ti99_cartridge_pcb()
 	: m_cart(nullptr),
-		m_grom_idle(false),
-		m_grom_size(0),
-		m_rom_size(0),
-		m_ram_size(0),
 		m_rom_ptr(nullptr),
 		m_ram_ptr(nullptr),
-		m_romspace_selected(false),
-		m_rom_page(0),
-		m_grom_ptr(nullptr),
-		m_grom_address(0),
-		m_ram_page(0),
 		m_tag(nullptr)
 {
 }
@@ -466,9 +587,14 @@ void ti99_cartridge_pcb::set_cartridge(ti99_cartridge_device *cart)
 	m_cart = cart;
 }
 
+void ti99_cartridge_pcb::set_rom_page(int page)
+{
+	m_cart->m_rom_page = page & m_rom_mask;
+}
+
 void ti99_cartridge_pcb::gromreadz(uint8_t* value)
 {
-	for (auto & elem : m_grom)
+	for (auto & elem : m_cart->m_grom)
 	{
 		if (elem != nullptr)
 		{
@@ -479,7 +605,7 @@ void ti99_cartridge_pcb::gromreadz(uint8_t* value)
 
 void ti99_cartridge_pcb::gromwrite(uint8_t data)
 {
-	for (auto & elem : m_grom)
+	for (auto & elem : m_cart->m_grom)
 	{
 		if (elem != nullptr)
 		{
@@ -495,17 +621,20 @@ void ti99_cartridge_pcb::gromwrite(uint8_t data)
 */
 void ti99_cartridge_pcb::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		if (m_rom_ptr!=nullptr)
+		if (m_cart->has_rom())
 		{
 			*value = m_rom_ptr[offset & 0x1fff];
 		}
 		else
 		{
-			// Check if we have RAM in the ROM socket
-			if ((offset & 0x1fff) < m_ram_size)
-				*value = m_ram_ptr[offset & 0x1fff];
+			if (m_cart->has_ram())
+			{
+				// Check if we have RAM in the ROM socket
+				if ((offset & 0x1fff) < m_cart->m_ram_size)
+					*value = m_ram_ptr[offset & 0x1fff];
+			}
 		}
 	}
 	else
@@ -517,17 +646,20 @@ void ti99_cartridge_pcb::readz(offs_t offset, uint8_t *value)
 
 void ti99_cartridge_pcb::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		if (m_ram_ptr == nullptr) LOGMASKED(LOG_WARN, "Cannot write to cartridge ROM space at %04x\n", offset | 0x6000);
-		else
+		if (m_cart->has_ram())
 		{
 			// Check if we have RAM in the ROM socket
-			if ((offset & 0x1fff) < m_ram_size)
+			if ((offset & 0x1fff) < m_cart->m_ram_size)
 				m_ram_ptr[offset & 0x1fff] = data;
 			else
 				LOGMASKED(LOG_WARN, "Cannot write to cartridge RAM space at %04x\n", offset | 0x6000);
 		}
+		else
+			// Do not warn by default; devices like Horizon will create a lot of
+			// meaningless warnings at this point
+			 LOGMASKED(LOG_WARNW, "Cannot write to cartridge ROM space at %04x\n", offset | 0x6000);
 	}
 	else
 	{
@@ -544,17 +676,6 @@ void ti99_cartridge_pcb::cruwrite(offs_t offset, uint8_t data)
 {
 }
 
-void ti99_cartridge_pcb::set_grom_pointer(int number, device_t *dev)
-{
-	m_grom[number] = static_cast<tmc0430_device*>(dev);
-}
-
-
-WRITE_LINE_MEMBER( ti99_cartridge_pcb::romgq_line )
-{
-	m_romspace_selected = (state==ASSERT_LINE);
-}
-
 // Propagate to all GROMs
 
 /*
@@ -562,24 +683,24 @@ WRITE_LINE_MEMBER( ti99_cartridge_pcb::romgq_line )
 */
 void ti99_cartridge_pcb::set_gromlines(line_state mline, line_state moline, line_state gsq)
 {
-	for (auto& elem : m_grom)
+	for (auto& elem : m_cart->m_grom)
 	{
 		if (elem != nullptr)
 		{
 			elem->set_lines(mline, moline, gsq);
-			if (gsq==ASSERT_LINE) m_grom_idle = false;
+			if (gsq==ASSERT_LINE) m_cart->m_grom_idle = false;
 		}
 	}
 }
 
-WRITE_LINE_MEMBER(ti99_cartridge_pcb::gclock_in)
+void ti99_cartridge_pcb::gclock_in(int state)
 {
-	for (auto& elem : m_grom)
+	for (auto& elem : m_cart->m_grom)
 	{
 		if (elem != nullptr)
 		{
 			elem->gclock_in(state);
-			m_grom_idle = elem->idle();
+			m_cart->m_grom_idle = elem->idle();
 		}
 	}
 }
@@ -611,7 +732,7 @@ WRITE_LINE_MEMBER(ti99_cartridge_pcb::gclock_in)
 
 void ti99_paged12k_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
 		// rom_ptr: 0000-0fff = rom1
 		//          2000-2fff = rom2a
@@ -619,7 +740,7 @@ void ti99_paged12k_cartridge::readz(offs_t offset, uint8_t *value)
 		if ((offset & 0x1000)==0)
 			*value = m_rom_ptr[offset & 0x0fff];
 		else
-			*value = m_rom_ptr[(offset & 0x0fff) | 0x2000 | (m_rom_page << 12)];
+			*value = m_rom_ptr[(offset & 0x0fff) | 0x2000 | (rom_page() << 12)];
 	}
 	else
 	{
@@ -630,11 +751,11 @@ void ti99_paged12k_cartridge::readz(offs_t offset, uint8_t *value)
 
 void ti99_paged12k_cartridge::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		m_rom_page = (offset >> 1) & 1;
+		set_rom_page(offset >> 1);
 		if ((offset & 1)==0)
-			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 	}
 	else
 	{
@@ -666,9 +787,9 @@ void ti99_paged12k_cartridge::write(offs_t offset, uint8_t data)
 
 void ti99_paged16k_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		*value = m_rom_ptr[(offset & 0x1fff) | (m_rom_page << 13)];
+		*value = m_rom_ptr[(offset & 0x1fff) | (rom_page() << 13)];
 	}
 	else
 	{
@@ -679,11 +800,11 @@ void ti99_paged16k_cartridge::readz(offs_t offset, uint8_t *value)
 
 void ti99_paged16k_cartridge::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		m_rom_page = (offset >> 1) & 1;
+		set_rom_page(offset >> 1);
 		if ((offset & 1)==0)
-			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 	}
 	else
 	{
@@ -713,11 +834,11 @@ void ti99_paged16k_cartridge::write(offs_t offset, uint8_t data)
 /* Read function for the minimem cartridge. */
 void ti99_minimem_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
 		if ((offset & 0x1000)==0x0000)
 		{
-			if (m_rom_ptr!=nullptr)    // Super-Minimem seems to have no ROM
+			if (m_cart->has_rom())    // Super-Minimem seems to have no ROM
 			{
 				*value = m_rom_ptr[offset & 0x0fff];
 			}
@@ -736,7 +857,7 @@ void ti99_minimem_cartridge::readz(offs_t offset, uint8_t *value)
 /* Write function for the minimem cartridge. */
 void ti99_minimem_cartridge::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
 		if ((offset & 0x1000)==0x0000)
 		{
@@ -788,11 +909,11 @@ void ti99_minimem_cartridge::write(offs_t offset, uint8_t data)
 /* Read function for the super cartridge. */
 void ti99_super_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		if (m_ram_ptr != nullptr)
+		if (m_cart->has_ram())
 		{
-			*value = m_ram_ptr[(m_ram_page << 13) | (offset & 0x1fff)];
+			*value = m_ram_ptr[(ram_page() << 13) | (offset & 0x1fff)];
 		}
 	}
 	else
@@ -804,9 +925,9 @@ void ti99_super_cartridge::readz(offs_t offset, uint8_t *value)
 /* Write function for the super cartridge. */
 void ti99_super_cartridge::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		m_ram_ptr[(m_ram_page << 13) | (offset & 0x1fff)] = data;
+		m_ram_ptr[(ram_page() << 13) | (offset & 0x1fff)] = data;
 	}
 	else
 	{
@@ -843,7 +964,7 @@ void ti99_super_cartridge::crureadz(offs_t offset, uint8_t *value)
 	if ((offset & 0xfff0) == 0x0800)
 	{
 		LOGMASKED(LOG_CRU, "CRU accessed at %04x\n", offset);
-		uint8_t val = 0x02 << (m_ram_page << 1);
+		uint8_t val = 0x02 << (ram_page() << 1);
 		*value = BIT(val, (offset & 0x000e) >> 1);
 	}
 }
@@ -855,9 +976,9 @@ void ti99_super_cartridge::cruwrite(offs_t offset, uint8_t data)
 		LOGMASKED(LOG_CRU, "CRU accessed at %04x\n", offset);
 		if (data != 0)
 		{
-			m_ram_page = (offset-0x0802)>>2;
+			set_ram_page((offset-0x0802)>>2);
 			if ((offset & 1)==0)
-				LOGMASKED(LOG_BANKSWITCH, "Set RAM page = %d (CRU address %04x)\n", m_ram_page, offset);
+				LOGMASKED(LOG_BANKSWITCH, "Set RAM page = %d (CRU address %04x)\n", ram_page(), offset);
 		}
 	}
 }
@@ -905,9 +1026,9 @@ void ti99_super_cartridge::cruwrite(offs_t offset, uint8_t data)
 /* Read function for the mbx cartridge. */
 void ti99_mbx_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		if (m_ram_ptr != nullptr && (offset & 0x1c00)==0x0c00)
+		if (m_cart->has_ram() && (offset & 0x1c00)==0x0c00)
 		{
 			// Also reads the value of 6ffe
 			*value = m_ram_ptr[offset & 0x03ff];
@@ -915,14 +1036,14 @@ void ti99_mbx_cartridge::readz(offs_t offset, uint8_t *value)
 		}
 		else
 		{
-			if (m_rom_ptr!=nullptr)
+			if (m_cart->has_rom())
 			{
 				if ((offset & 0x1000)==0)  // 6000 area
 					*value = m_rom_ptr[offset];
 				else  // 7000 area
-					*value = m_rom_ptr[(offset & 0x0fff) | (m_rom_page << 12)];
+					*value = m_rom_ptr[(offset & 0x0fff) | (rom_page() << 12)];
 
-				LOGMASKED(LOG_READ, "%04x(%04x) -> %02x\n", offset + 0x6000, offset | (m_rom_page<<13), *value);
+				LOGMASKED(LOG_READ, "%04x(%04x) -> %02x\n", offset + 0x6000, offset | (rom_page()<<13), *value);
 			}
 		}
 	}
@@ -935,19 +1056,19 @@ void ti99_mbx_cartridge::readz(offs_t offset, uint8_t *value)
 /* Write function for the mbx cartridge. */
 void ti99_mbx_cartridge::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
 		if ((offset & 0x1c00)==0x0c00)  // RAM area
 		{
 			if ((offset & 0x0ffe) == 0x0ffe)   // Mapper, backed by RAM; reacts to bots 6fff and 6ffe
 			{
 				// Valid values are 0, 1, 2, 3
-				m_rom_page = data & 3;
+				set_rom_page(data);
 				if ((offset & 1)==0)
-					LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+					LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 			}
 
-			if (m_ram_ptr != nullptr)
+			if (m_cart->has_ram())
 				m_ram_ptr[offset & 0x03ff] = data;
 			else
 				LOGMASKED(LOG_WARN, "Write access to %04x but no RAM present\n", offset+0x6000);
@@ -990,16 +1111,16 @@ void ti99_mbx_cartridge::write(offs_t offset, uint8_t data)
 /* Read function for the paged7 cartridge. */
 void ti99_paged7_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		if (m_rom_ptr!=nullptr)
+		if (m_cart->has_rom())
 		{
 			if ((offset & 0x1000)==0x0000)  // 6000 area
 				*value = m_rom_ptr[offset];
 			else  // 7000 area
-				*value = m_rom_ptr[(offset & 0x0fff) | (m_rom_page << 12)];
+				*value = m_rom_ptr[(offset & 0x0fff) | (rom_page() << 12)];
 
-			LOGMASKED(LOG_READ, "%04x(%04x) -> %02x\n", offset + 0x6000, offset | (m_rom_page<<13), *value);
+			LOGMASKED(LOG_READ, "%04x(%04x) -> %02x\n", offset + 0x6000, offset | (rom_page()<<13), *value);
 		}
 	}
 	else
@@ -1011,15 +1132,14 @@ void ti99_paged7_cartridge::readz(offs_t offset, uint8_t *value)
 /* Write function for the paged7 cartridge. */
 void ti99_paged7_cartridge::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
 		// 0111 0000 0000 0110
 		if ((offset & 0x1ff9) == 0x1000)   // Mapper
 		{
-			// Valid values are 0, 1, 2, 3
-			m_rom_page = (offset>>1) & 3;
+			set_rom_page(offset>>1);
 			if ((offset & 1)==0)
-				LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+				LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 		}
 	}
 	else
@@ -1076,8 +1196,8 @@ void ti99_paged7_cartridge::write(offs_t offset, uint8_t data)
 /* Read function for the paged379i cartridge. */
 void ti99_paged379i_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
-		*value = m_rom_ptr[(m_rom_page<<13) | (offset & 0x1fff)];
+	if (romspace_selected())
+		*value = m_rom_ptr[(rom_page()<<13) | (offset & 0x1fff)];
 }
 
 /* Write function for the paged379i cartridge. Only used to set the bank. */
@@ -1085,20 +1205,12 @@ void ti99_paged379i_cartridge::write(offs_t offset, uint8_t data)
 {
 	// Bits: 011x xxxx xxxb bbbx
 	// x = don't care, bbbb = bank
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		// This is emulation magic to automatically adapt to different ROM sizes
-
-		// Each block has 8 KiB. We assume that m_rom_size is a power of 2.
-		// Thus the number of blocks is also a power of 2.
-		// To get the required number of address lines, we just have to subtract 1.
-		// The SN74LS379 only has four flipflops, so we limit the lines to 4.
-		int mask = ((m_rom_size / 8192) - 1) & 0x0f;
-
 		// The page is determined by the inverted outputs.
-		m_rom_page = (~offset)>>1 & mask;
+		set_rom_page((~offset)>>1);
 		if ((offset & 1)==0)
-			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 	}
 }
 
@@ -1106,6 +1218,7 @@ void ti99_paged379i_cartridge::write(offs_t offset, uint8_t data)
   Cartridge type: paged378
   This type is intended for high-capacity cartridges of up to 512 KiB
   plus GROM space of 120KiB (not supported yet)
+  For smaller ROMs, the ROM is automatically mirrored in the bank space.
 
   Due to its huge GROM space it is also called the "UberGROM"
 
@@ -1127,8 +1240,8 @@ void ti99_paged379i_cartridge::write(offs_t offset, uint8_t data)
 /* Read function for the paged378 cartridge. */
 void ti99_paged378_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
-		*value = m_rom_ptr[(m_rom_page<<13) | (offset & 0x1fff)];
+	if (romspace_selected())
+		*value = m_rom_ptr[(rom_page()<<13) | (offset & 0x1fff)];
 }
 
 /* Write function for the paged378 cartridge. Only used to set the bank. */
@@ -1136,11 +1249,12 @@ void ti99_paged378_cartridge::write(offs_t offset, uint8_t data)
 {
 	// Bits: 011x xxxx xbbb bbbx
 	// x = don't care, bbbb = bank
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		m_rom_page = ((offset >> 1)&0x003f);
+		set_rom_page(offset >> 1);
+
 		if ((offset & 1)==0)
-			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 	}
 }
 
@@ -1167,8 +1281,8 @@ void ti99_paged378_cartridge::write(offs_t offset, uint8_t data)
 /* Read function for the paged377 cartridge. */
 void ti99_paged377_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
-		*value = m_rom_ptr[(m_rom_page<<13) | (offset & 0x1fff)];
+	if (romspace_selected())
+		*value = m_rom_ptr[(rom_page()<<13) | (offset & 0x1fff)];
 }
 
 /* Write function for the paged377 cartridge. Only used to set the bank. */
@@ -1176,11 +1290,11 @@ void ti99_paged377_cartridge::write(offs_t offset, uint8_t data)
 {
 	// Bits: 011x xxxb bbbb bbbx
 	// x = don't care, bbbb = bank
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		m_rom_page = ((offset >> 1)&0x00ff);
+		set_rom_page(offset >> 1);
 		if ((offset & 1)==0)
-			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 	}
 }
 
@@ -1221,8 +1335,8 @@ void ti99_paged377_cartridge::write(offs_t offset, uint8_t data)
 /* Read function for the pagedcru cartridge. */
 void ti99_pagedcru_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_romspace_selected)
-		*value = m_rom_ptr[(m_rom_page<<13) | (offset & 0x1fff)];
+	if (romspace_selected())
+		*value = m_rom_ptr[(rom_page()<<13) | (offset & 0x1fff)];
 }
 
 /* Write function for the pagedcru cartridge. No effect. */
@@ -1233,7 +1347,7 @@ void ti99_pagedcru_cartridge::write(offs_t offset, uint8_t data)
 
 void ti99_pagedcru_cartridge::crureadz(offs_t offset, uint8_t *value)
 {
-	int page = m_rom_page;
+	int page = rom_page();
 	if ((offset & 0xf800)==0x0800)
 	{
 		int bit = (offset & 0x001e)>>1;
@@ -1252,8 +1366,8 @@ void ti99_pagedcru_cartridge::cruwrite(offs_t offset, uint8_t data)
 		int bit = (offset & 0x001e)>>1;
 		if (data != 0 && bit > 0)
 		{
-			m_rom_page = (bit-1)/2;
-			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (CRU address %d)\n", m_rom_page, offset);
+			set_rom_page((bit-1)>>1);
+			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (CRU address %d)\n", rom_page(), offset);
 		}
 	}
 }
@@ -1270,23 +1384,16 @@ void ti99_pagedcru_cartridge::cruwrite(offs_t offset, uint8_t data)
     will deliver the address when reading.
   - No wait states. Reading is generally faster than with real GROMs.
   - No wrapping at 8K boundaries.
-  - Two pages of ROM at address 6000
-
-  If any of these fails, the cartridge will crash, so we'll see.
+  - One or two ROM sockets; if one socket, the standard bank switch scheme is
+    used
 
   Typical cartridges: Third-party cartridges
 
   For the sake of simplicity, we register GROMs like the other PCB types, but
   we implement special access methods for the GROM space.
 
-  Still not working:
-     rxb1002 (Set page to 1 (6372 <- 00), lockup)
-     rxb237 (immediate reset)
-     rxbv555 (repeating reset on Master Title Screen)
-     superxb (lockup, fix: add RAM at 7c00)
-
   Super-MiniMemory is also included here. We assume a RAM area at addresses
-  7000-7fff for this cartridge.
+  7000-7fff for this cartridge if the RAM option is used.
 
 
   GROM space
@@ -1296,32 +1403,36 @@ void ti99_pagedcru_cartridge::cruwrite(offs_t offset, uint8_t data)
   ROM space
   6000         7000        7fff
   |             |             |
-  |========== ROM1 ===========|     Bank 0    write to 6000, 6004, ... 7ffc
+  |========== ROM1 ===========|     Bank 0
   |             |             |
-  |========== ROM2 ===========|     Bank 1    write to 6002, 6006, ... 7ffe
+  |========== ROM2 ===========|     Bank 1
+  ...                       ...
+  |========== ROMn ===========|     Bank n-1
 
+  Depending on the number of banks, a number of address bits is used to select
+  the bank:
+
+  Write to 011x xxxx xxxx xxx0 -> Set bank number to xxxxxxxxxxxx
+
+  The number xxxxxxxxxxxx has just enough bits to encode the highest bank number.
+  Higher bits are ignored.
+
+  If rom2_socket is used, we assume that rom_socket and rom2_socket contain
+  8K ROM each, so we have exactly two banks, regardless of the ROM length.
+
+  The maximum ROM size is 32 MiB (4096 pages of 8 KiB)
 
 ******************************************************************************/
 
-void ti99_gromemu_cartridge::set_gromlines(line_state mline, line_state moline, line_state gsq)
-{
-	if (m_grom_ptr != nullptr)
-	{
-		m_grom_selected = (gsq == ASSERT_LINE);
-		m_grom_read_mode = (mline == ASSERT_LINE);
-		m_grom_address_mode = (moline == ASSERT_LINE);
-	}
-}
-
 void ti99_gromemu_cartridge::readz(offs_t offset, uint8_t *value)
 {
-	if (m_grom_selected)
+	if (m_cart->m_grom_selected)
 	{
-		if (m_grom_read_mode) gromemureadz(offset, value);
+		if (m_cart->m_grom_read_mode) gromemureadz(offset, value);
 	}
 	else
 	{
-		if (m_ram_ptr != nullptr)
+		if (m_cart->has_ram())
 		{
 			// Variant of the cartridge which emulates MiniMemory. We don't introduce
 			// another type for this single cartridge.
@@ -1332,16 +1443,16 @@ void ti99_gromemu_cartridge::readz(offs_t offset, uint8_t *value)
 			}
 		}
 
-		if (m_rom_ptr == nullptr) return;
-		*value = m_rom_ptr[(offset & 0x1fff) | (m_rom_page << 13)];
+		if (m_cart->has_rom())
+			*value = m_rom_ptr[(offset & 0x1fff) | (rom_page() << 13)];
 	}
 }
 
 void ti99_gromemu_cartridge::write(offs_t offset, uint8_t data)
 {
-	if (m_romspace_selected)
+	if (romspace_selected())
 	{
-		if (m_ram_ptr != nullptr)
+		if (m_cart->has_ram())
 		{
 			// Lines for Super-Minimem; see above
 			if ((offset & 0x1000)==0x1000) {
@@ -1349,17 +1460,17 @@ void ti99_gromemu_cartridge::write(offs_t offset, uint8_t data)
 			}
 			return; // no paging
 		}
-		m_rom_page = (offset >> 1) & 1;
+
+		set_rom_page(offset >> 1);
+
 		if ((offset & 1)==0)
-			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", m_rom_page, (offset | 0x6000));
+			LOGMASKED(LOG_BANKSWITCH, "Set ROM page = %d (writing to %04x)\n", rom_page(), (offset | 0x6000));
 	}
 	else
 	{
 		// Will not change anything when not selected (preceding gsq=ASSERT)
-		if (m_grom_selected)
-		{
-			if (!m_grom_read_mode) gromemuwrite(offset, data);
-		}
+		if (m_cart->m_grom_selected && !m_cart->m_grom_read_mode)
+			gromemuwrite(offset, data);
 	}
 }
 
@@ -1367,43 +1478,44 @@ void ti99_gromemu_cartridge::gromemureadz(offs_t offset, uint8_t *value)
 {
 	// Similar to the GKracker implemented above, we do not have a readable
 	// GROM address counter but use the one from the console GROMs.
-	if (m_grom_address_mode) return;
+	if (m_cart->m_grom_address_mode) return;
 
-	int id = ((m_grom_address & 0xe000)>>13)&0x07;
+	int id = ((m_cart->m_grom_address & 0xe000)>>13)&0x07;
 	if (id > 2)
 	{
 		// Cartridge space (0x6000 - 0xffff)
-		*value = m_grom_ptr[m_grom_address-0x6000]; // use the GROM memory
+		if (m_grom_ptr != nullptr)
+			*value = m_grom_ptr[m_cart->m_grom_address-0x6000]; // use the GROM memory
 	}
 
 	// The GROM emulation does not wrap at 8K boundaries.
-	m_grom_address = (m_grom_address + 1) & 0xffff;
+	m_cart->m_grom_address = (m_cart->m_grom_address + 1) & 0xffff;
 
 	// Reset the write address flipflop.
-	m_waddr_LSB = false;
+	m_cart->m_waddr_LSB = false;
 }
 
 void ti99_gromemu_cartridge::gromemuwrite(offs_t offset, uint8_t data)
 {
 	// Set GROM address
-	if (m_grom_address_mode)
+	if (m_cart->m_grom_address_mode)
 	{
-		if (m_waddr_LSB == true)
+		if (m_cart->m_waddr_LSB == true)
 		{
 			// Accept low address byte (second write)
-			m_grom_address = (m_grom_address << 8) | data;
-			m_waddr_LSB = false;
+			m_cart->m_grom_address = (m_cart->m_grom_address << 8) | data;
+			m_cart->m_waddr_LSB = false;
 		}
 		else
 		{
 			// Accept high address byte (first write)
-			m_grom_address = data;
-			m_waddr_LSB = true;
+			m_cart->m_grom_address = data;
+			m_cart->m_waddr_LSB = true;
 		}
 	}
 	else
 	{
-		LOGMASKED(LOG_WARN, "Ignoring write to GROM area at address %04x\n", m_grom_address);
+		LOGMASKED(LOG_WARN, "Ignoring write to GROM area at address %04x\n", m_cart->m_grom_address);
 	}
 }
 
@@ -1412,51 +1524,10 @@ void ti99_gromemu_cartridge::gromemuwrite(offs_t offset, uint8_t data)
 
     RPK loader
 
-    RPK format support
-
-    A RPK file ("rompack") contains a collection of dump files and a layout
-    file that defines the kind of circuit board (PCB) used in the cartridge
-    and the mapping of dumps to sockets on the board.
-
-Example:
-    <?xml version="1.0" encoding="utf-8"?>
-    <romset>
-        <resources>
-            <rom id="gromimage" file="ed-assmg.bin" />
-        </resources>
-        <configuration>
-            <pcb type="standard">
-                <socket id="grom_socket" uses="gromimage"/>
-            </pcb>
-        </configuration>
-    </romset>
-
-DTD:
-    <!ELEMENT romset (resources, configuration)>
-    <!ELEMENT resources (rom|ram)+>
-    <!ELEMENT rom EMPTY>
-    <!ELEMENT ram EMPTY>
-    <!ELEMENT configuration (pcb)>
-    <!ELEMENT pcb (socket)+>
-    <!ELEMENT socket EMPTY>
-    <!ATTLIST romset version CDATA #IMPLIED>
-    <!ATTLIST rom id ID #REQUIRED
-    <!ATTLIST rom file CDATA #REQUIRED>
-    <!ATTLIST rom crc CDATA #IMPLIED>
-    <!ATTLIST rom sha1 CDATA #IMPLIED>
-    <!ATTLIST ram id ID #REQUIRED>
-    <!ATTLIST ram type (volatile|persistent) #IMPLIED>
-    <!ATTLIST ram store (internal|external) #IMPLIED>
-    <!ATTLIST ram file CDATA #IMPLIED>
-    <!ATTLIST ram length CDATA #REQUIRED>
-    <!ATTLIST pcb type CDATA #REQUIRED>
-    <!ATTLIST socket id ID #REQUIRED>
-    <!ATTLIST socket uses IDREF #REQUIRED>
-
 ****************************************************************************/
 
 #undef LOG_OUTPUT_FUNC
-#define LOG_OUTPUT_FUNC printf
+#define LOG_OUTPUT_FUNC osd_printf_info
 
 /****************************************
     RPK class
@@ -1496,7 +1567,7 @@ int ti99_cartridge_device::rpk::get_resource_length(const char *socket_name)
 	return socket->second->get_content_length();
 }
 
-void ti99_cartridge_device::rpk::add_socket(const char* id, std::unique_ptr<rpk_socket> newsock)
+void ti99_cartridge_device::rpk::add_socket(const char* id, std::unique_ptr<ti99_rpk_socket> &&newsock)
 {
 	m_sockets.emplace(id, std::move(newsock));
 }
@@ -1518,8 +1589,8 @@ void ti99_cartridge_device::rpk::close()
 				throw emu_fatalerror("ti99_cartridge_device::rpk::close: Buffer is null or length is 0");
 
 			emu_file file(m_options.nvram_directory(), OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS);
-			osd_file::error filerr = file.open(socket.second->get_pathname());
-			if (filerr == osd_file::error::NONE)
+			std::error_condition const filerr = file.open(socket.second->get_pathname());
+			if (!filerr)
 				file.write(socket.second->get_contents(), socket.second->get_content_length());
 
 		}
@@ -1532,191 +1603,68 @@ void ti99_cartridge_device::rpk::close()
     not a network socket)
 ***************************************************************/
 
-ti99_cartridge_device::rpk_socket::rpk_socket(const char* id, int length, uint8_t* contents, std::string &&pathname)
-	: m_id(id), m_length(length), m_contents(contents), m_pathname(std::move(pathname))
+ti99_cartridge_device::ti99_rpk_socket::ti99_rpk_socket(const char* id, int length, std::vector<uint8_t> &&contents, std::string &&pathname)
+	: m_id(id), m_length(length), m_contents(std::move(contents)), m_pathname(std::move(pathname))
 {
 }
 
-ti99_cartridge_device::rpk_socket::rpk_socket(const char* id, int length, uint8_t* contents)
-	: rpk_socket(id, length, contents, "")
+ti99_cartridge_device::ti99_rpk_socket::ti99_rpk_socket(const char* id, int length, std::vector<uint8_t> &&contents)
+	: ti99_rpk_socket(id, length, std::move(contents), "")
 {
-}
-
-/*
-    Locate a file in the ZIP container
-*/
-int ti99_cartridge_device::rpk_reader::find_file(util::archive_file &zip, const char *filename, uint32_t crc)
-{
-	for (int header = zip.first_file(); header >= 0; header = zip.next_file())
-	{
-		// Ignore directories
-		if (!zip.current_is_directory())
-		{
-			// We don't check for CRC == 0.
-			if (crc != 0)
-			{
-				// if the CRC and name both match, we're good
-				// if the CRC matches and the name doesn't, we're still good
-				if (zip.current_crc() == crc)
-					return header;
-			}
-			else
-			{
-				if (core_stricmp(zip.current_name().c_str(), filename) == 0)
-				{
-					return header;
-				}
-			}
-		}
-	}
-	return -1;
 }
 
 /*
     Load a rom resource and put it in a pcb socket instance.
 */
-std::unique_ptr<ti99_cartridge_device::rpk_socket> ti99_cartridge_device::rpk_reader::load_rom_resource(util::archive_file &zip, util::xml::data_node const* rom_resource_node, const char* socketname)
+std::error_condition ti99_cartridge_device::rpk_load_rom_resource(const rpk_socket &socket, std::unique_ptr<ti99_rpk_socket> &result)
 {
-	const char* file;
-	const char* crcstr;
-	const char* sha1;
-	util::archive_file::error ziperr;
-	uint32_t crc;
-	int length;
-	uint8_t* contents;
-	int header;
+	LOGMASKED(LOG_RPK, "[RPK handler] Loading ROM contents for socket '%s' from file %s\n", socket.id(), socket.filename());
 
-	// find the file attribute (required)
-	file = rom_resource_node->get_attribute_string("file", nullptr);
-	if (file == nullptr) throw rpk_exception(RPK_INVALID_LAYOUT, "<rom> must have a 'file' attribute");
-
-	LOGMASKED(LOG_RPK, "[RPK handler] Loading ROM contents for socket '%s' from file %s\n", socketname, file);
-
-	// check for crc
-	crcstr = rom_resource_node->get_attribute_string("crc", nullptr);
-	if (crcstr==nullptr)
-	{
-		// no CRC, just find the file in the RPK
-		header = find_file(zip, file, 0);
-	}
-	else
-	{
-		crc = strtoul(crcstr, nullptr, 16);
-		header = find_file(zip, file, crc);
-	}
-	if (header < 0) throw rpk_exception(RPK_INVALID_FILE_REF, "File not found or CRC check failed");
-
-	length = zip.current_uncompressed_length();
-
-	// Allocate storage
-	contents = global_alloc_array_clear<uint8_t>(length);
-	if (contents==nullptr) throw rpk_exception(RPK_OUT_OF_MEMORY);
-
-	// and unzip file from the zip file
-	ziperr = zip.decompress(contents, length);
-	if (ziperr != util::archive_file::error::NONE)
-	{
-		if (ziperr == util::archive_file::error::UNSUPPORTED) throw rpk_exception(RPK_ZIP_UNSUPPORTED);
-		else throw rpk_exception(RPK_ZIP_ERROR);
-	}
-
-	// check for sha1
-	sha1 = rom_resource_node->get_attribute_string("sha1", nullptr);
-	if (sha1 != nullptr)
-	{
-		util::hash_collection actual_hashes;
-		actual_hashes.compute((const uint8_t *)contents, length, util::hash_collection::HASH_TYPES_CRC_SHA1);
-
-		util::hash_collection expected_hashes;
-		expected_hashes.add_from_string(util::hash_collection::HASH_SHA1, sha1, strlen(sha1));
-
-		if (actual_hashes != expected_hashes) throw rpk_exception(RPK_INVALID_FILE_REF, "SHA1 check failed");
-	}
+	std::vector<uint8_t> contents;
+	std::error_condition err =  socket.read_file(contents);
+	if (err)
+		return err;
 
 	// Create a socket instance
-	return std::make_unique<rpk_socket>(socketname, length, contents);
+	result = std::make_unique<ti99_rpk_socket>(socket.id().c_str(), contents.size(), std::move(contents));
+	return std::error_condition();
 }
 
 /*
     Load a ram resource and put it in a pcb socket instance.
 */
-std::unique_ptr<ti99_cartridge_device::rpk_socket> ti99_cartridge_device::rpk_reader::load_ram_resource(emu_options &options, util::xml::data_node const* ram_resource_node, const char* socketname, const char* system_name)
+std::unique_ptr<ti99_cartridge_device::ti99_rpk_socket> ti99_cartridge_device::rpk_load_ram_resource(emu_options &options, const rpk_socket &socket, const char *system_name)
 {
-	const char* length_string;
-	const char* ram_type;
-	const char* ram_filename;
-	std::string ram_pname;
-	unsigned int length;
-	uint8_t* contents;
-
-	// find the length attribute
-	length_string = ram_resource_node->get_attribute_string("length", nullptr);
-	if (length_string == nullptr) throw rpk_exception(RPK_MISSING_RAM_LENGTH);
-
-	// parse it
-	char suffix = '\0';
-	sscanf(length_string, "%u%c", &length, &suffix);
-	switch(tolower(suffix))
-	{
-		case 'k': // kilobytes
-			length *= 1024;
-			break;
-
-		case 'm':
-			/* megabytes */
-			length *= 1024*1024;
-			break;
-
-		case '\0':
-			break;
-
-		default:  // failed
-			throw rpk_exception(RPK_INVALID_RAM_SPEC);
-	}
-
 	// Allocate memory for this resource
-	contents = global_alloc_array_clear<uint8_t>(length);
-	if (contents==nullptr) throw rpk_exception(RPK_OUT_OF_MEMORY);
+	std::vector<uint8_t> contents;
+	contents.resize(socket.length());
+	std::fill(contents.begin(), contents.end(), 0);
 
-	LOGMASKED(LOG_RPK, "[RPK handler] Allocating RAM buffer (%d bytes) for socket '%s'\n", length, socketname);
+	LOGMASKED(LOG_RPK, "[RPK handler] Allocating RAM buffer (%d bytes) for socket '%s'\n", socket.length(), socket.id());
 
 	// That's it for pure RAM. Now check whether the RAM is "persistent", i.e. NVRAM.
 	// In that case we must load it from the NVRAM directory.
 	// The file name is given in the RPK file; the subdirectory is the system name.
-	ram_type = ram_resource_node->get_attribute_string("type", nullptr);
-	if (ram_type != nullptr)
+	std::string ram_pname;
+	if (socket.type() == rpk_socket::socket_type::PERSISTENT_RAM)
 	{
-		if (strcmp(ram_type, "persistent")==0)
-		{
-			// Get the file name (required if persistent)
-			ram_filename = ram_resource_node->get_attribute_string("file", nullptr);
-			if (ram_filename==nullptr)
-			{
-				global_free_array(contents);
-				throw rpk_exception(RPK_INVALID_RAM_SPEC, "<ram type='persistent'> must have a 'file' attribute");
-			}
-			ram_pname = std::string(system_name).append(PATH_SEPARATOR).append(ram_filename);
-			// load, and fill rest with 00
-			LOGMASKED(LOG_RPK, "[RPK handler] Loading NVRAM contents from '%s'\n", ram_pname.c_str());
+		ram_pname = std::string(system_name).append(PATH_SEPARATOR).append(socket.filename());
+		// load, and fill rest with 00
+		LOGMASKED(LOG_RPK, "[RPK handler] Loading NVRAM contents from '%s'\n", ram_pname);
 
-			// Load the NVRAM contents
-			if (!contents || (length <= 0))
-				throw emu_fatalerror("ti99_cartridge_device::rpk_reader::load_ram_resource: Buffer is null or length is 0");
+		// try to open the battery file and read it if possible
+		emu_file file(options.nvram_directory(), OPEN_FLAG_READ);
+		std::error_condition const filerr = file.open(ram_pname);
+		int bytes_read = 0;
+		if (!filerr)
+			bytes_read = file.read(&contents[0], contents.size());
 
-			// try to open the battery file and read it if possible
-			emu_file file(options.nvram_directory(), OPEN_FLAG_READ);
-			osd_file::error filerr = file.open(ram_pname);
-			int bytes_read = 0;
-			if (filerr == osd_file::error::NONE)
-				bytes_read = file.read(contents, length);
-
-			// fill remaining bytes (if necessary)
-			memset(((char *) contents) + bytes_read, 0x00, length - bytes_read);
-		}
+		// fill remaining bytes (if necessary)
+		std::fill_n(&contents[bytes_read], contents.size() - bytes_read, 0x00);
 	}
 
 	// Create a socket instance
-	return std::make_unique<rpk_socket>(socketname, length, contents, std::move(ram_pname));
+	return std::make_unique<ti99_rpk_socket>(socket.id().c_str(), socket.length(), std::move(contents), std::move(ram_pname));
 }
 
 /*-------------------------------------------------
@@ -1725,127 +1673,47 @@ std::unique_ptr<ti99_cartridge_device::rpk_socket> ti99_cartridge_device::rpk_re
     system_name - name of the driver (also just for NVRAM handling)
 -------------------------------------------------*/
 
-ti99_cartridge_device::rpk* ti99_cartridge_device::rpk_reader::open(emu_options &options, const char *filename, const char *system_name)
+std::error_condition ti99_cartridge_device::rpk_open(emu_options &options, std::unique_ptr<util::random_read> &&stream, const char *system_name, std::unique_ptr<rpk> &result)
 {
-	util::archive_file::error ziperr;
+	std::unique_ptr<rpk> newrpk = std::make_unique<rpk>(options, system_name);
 
-	util::archive_file::ptr zipfile;
+	rpk_reader reader(pcbdefs, true);
 
-	std::vector<char> layout_text;
+	// open the RPK
+	rpk_file::ptr file;
+	std::error_condition err = reader.read(std::move(stream), file);
+	if (err)
+		return err;
 
-	int i;
+	// specify the PCB
+	newrpk->m_type = file->pcb_type() + 1;
+	LOGMASKED(LOG_RPK, "[RPK handler] Cartridge says it has PCB type '%s'\n", pcbdefs[file->pcb_type()]);
 
-	auto newrpk = new rpk(options, system_name);
-
-	try
+	for (const rpk_socket &socket : file->sockets())
 	{
-		/* open the ZIP file */
-		ziperr = util::archive_file::open_zip(filename, zipfile);
-		if (ziperr != util::archive_file::error::NONE) throw rpk_exception(RPK_NOT_ZIP_FORMAT);
+		std::unique_ptr<ti99_rpk_socket> ti99_socket;
 
-		/* find the layout.xml file */
-		if (find_file(*zipfile, "layout.xml", 0) < 0) throw rpk_exception(RPK_MISSING_LAYOUT);
-
-		/* reserve space for the layout file contents (+1 for the termination) */
-		layout_text.resize(zipfile->current_uncompressed_length() + 1);
-
-		/* uncompress the layout text */
-		ziperr = zipfile->decompress(&layout_text[0], zipfile->current_uncompressed_length());
-		if (ziperr != util::archive_file::error::NONE)
+		switch (socket.type())
 		{
-			if (ziperr == util::archive_file::error::UNSUPPORTED) throw rpk_exception(RPK_ZIP_UNSUPPORTED);
-			else throw rpk_exception(RPK_ZIP_ERROR);
-		}
+		case rpk_socket::socket_type::ROM:
+			err = rpk_load_rom_resource(socket, ti99_socket);
+			if (err)
+				return err;
+			newrpk->add_socket(socket.id().c_str(), std::move(ti99_socket));
+			break;
 
-		layout_text[zipfile->current_uncompressed_length()] = '\0';  // Null-terminate
+		case rpk_socket::socket_type::RAM:
+		case rpk_socket::socket_type::PERSISTENT_RAM:
+			newrpk->add_socket(socket.id().c_str(), rpk_load_ram_resource(options, socket, system_name));
+			break;
 
-		/* parse the layout text */
-		util::xml::file::ptr const layout_xml = util::xml::file::string_read(&layout_text[0], nullptr);
-		if (!layout_xml) throw rpk_exception(RPK_XML_ERROR);
-
-		// Now we work within the XML tree
-
-		// romset is the root node
-		util::xml::data_node const *const romset_node = layout_xml->get_child("romset");
-		if (!romset_node) throw rpk_exception(RPK_INVALID_LAYOUT, "document element must be <romset>");
-
-		// resources is a child of romset
-		util::xml::data_node const *const resources_node = romset_node->get_child("resources");
-		if (!resources_node) throw rpk_exception(RPK_INVALID_LAYOUT, "<romset> must have a <resources> child");
-
-		// configuration is a child of romset; we're actually interested in ...
-		util::xml::data_node const *const configuration_node = romset_node->get_child("configuration");
-		if (!configuration_node) throw rpk_exception(RPK_INVALID_LAYOUT, "<romset> must have a <configuration> child");
-
-		// ... pcb, which is a child of configuration
-		util::xml::data_node const *const pcb_node = configuration_node->get_child("pcb");
-		if (!pcb_node) throw rpk_exception(RPK_INVALID_LAYOUT, "<configuration> must have a <pcb> child");
-
-		// We'll try to find the PCB type on the provided type list.
-		char const *const pcb_type = pcb_node->get_attribute_string("type", nullptr);
-		if (!pcb_type) throw rpk_exception(RPK_INVALID_LAYOUT, "<pcb> must have a 'type' attribute");
-		LOGMASKED(LOG_RPK, "[RPK handler] Cartridge says it has PCB type '%s'\n", pcb_type);
-
-		i=0;
-		do
-		{
-			if (strcmp(pcb_type, m_types[i].name)==0)
-			{
-				newrpk->m_type = m_types[i].id;
-				break;
-			}
-			i++;
-		} while (m_types[i].id != 0);
-
-		if (m_types[i].id==0) throw rpk_exception(RPK_UNKNOWN_PCB_TYPE);
-
-		// Find the sockets and load their respective resource
-		for (util::xml::data_node const *socket_node = pcb_node->get_first_child();  socket_node != nullptr; socket_node = socket_node->get_next_sibling())
-		{
-			if (strcmp(socket_node->get_name(), "socket")!=0) throw rpk_exception(RPK_INVALID_LAYOUT, "<pcb> element has only <socket> children");
-			char const *const id = socket_node->get_attribute_string("id", nullptr);
-			if (!id) throw rpk_exception(RPK_INVALID_LAYOUT, "<socket> must have an 'id' attribute");
-			char const *const uses_name = socket_node->get_attribute_string("uses", nullptr);
-			if (!uses_name) throw rpk_exception(RPK_INVALID_LAYOUT, "<socket> must have a 'uses' attribute");
-
-			bool found = false;
-			// Locate the resource node
-			for (util::xml::data_node const *resource_node = resources_node->get_first_child(); resource_node != nullptr; resource_node = resource_node->get_next_sibling())
-			{
-				char const *const resource_name = resource_node->get_attribute_string("id", nullptr);
-				if (!resource_name) throw rpk_exception(RPK_INVALID_LAYOUT, "resource node must have an 'id' attribute");
-
-				if (strcmp(resource_name, uses_name)==0)
-				{
-					// found it
-					if (strcmp(resource_node->get_name(), "rom")==0)
-					{
-						newrpk->add_socket(id, load_rom_resource(*zipfile, resource_node, id));
-					}
-					else
-					{
-						if (strcmp(resource_node->get_name(), "ram")==0)
-						{
-							newrpk->add_socket(id, load_ram_resource(options, resource_node, id, system_name));
-						}
-						else throw rpk_exception(RPK_INVALID_LAYOUT, "resource node must be <rom> or <ram>");
-					}
-					found = true;
-				}
-			}
-			if (!found) throw rpk_exception(RPK_INVALID_RESOURCE_REF, uses_name);
+		default:
+			throw false;
 		}
 	}
-	catch (rpk_exception &)
-	{
-		newrpk->close();
 
-		// rethrow the exception
-		throw;
-	}
-
-	return newrpk;
+	result = std::move(newrpk);
+	return std::error_condition();
 }
 
-} } } // end namespace bus::ti99::gromport
-
+} // end namespace bus::ti99::gromport

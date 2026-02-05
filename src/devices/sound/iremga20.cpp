@@ -117,10 +117,11 @@ void iremga20_device::device_clock_changed()
 }
 
 //-------------------------------------------------
-//  rom_bank_updated - the rom bank has changed
+//  rom_bank_pre_change - refresh the stream if the
+//  ROM banking changes
 //-------------------------------------------------
 
-void iremga20_device::rom_bank_updated()
+void iremga20_device::rom_bank_pre_change()
 {
 	m_stream->update();
 }
@@ -129,16 +130,11 @@ void iremga20_device::rom_bank_updated()
 //  sound_stream_update - handle a stream update
 //-------------------------------------------------
 
-void iremga20_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void iremga20_device::sound_stream_update(sound_stream &stream)
 {
-	stream_sample_t *outL, *outR;
-
-	outL = outputs[0];
-	outR = outputs[1];
-
-	for (int i = 0; i < samples; i++)
+	for (int i = 0; i < stream.samples(); i++)
 	{
-		stream_sample_t sampleout = 0;
+		s32 sampleout = 0;
 
 		for (auto &ch : m_channel)
 		{
@@ -160,9 +156,8 @@ void iremga20_device::sound_stream_update(sound_stream &stream, stream_sample_t 
 			}
 		}
 
-		sampleout >>= 2;
-		outL[i] = sampleout;
-		outR[i] = sampleout;
+		stream.put_int(0, i, sampleout, 32768 * 4);
+		stream.put_int(1, i, sampleout, 32768 * 4);
 	}
 }
 

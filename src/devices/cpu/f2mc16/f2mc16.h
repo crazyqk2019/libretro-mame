@@ -14,8 +14,6 @@
 class f2mc16_device : public cpu_device
 {
 public:
-	friend class mb9061x_device;
-
 	enum
 	{
 		F2MC16_PC, F2MC16_PS, F2MC16_USP, F2MC16_SSP, F2MC16_ACC,
@@ -40,12 +38,15 @@ public:
 	// construction/destruction
 	f2mc16_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
+	bool rmw() { return m_rmw; }
+	void set_irq_level(int level);
+
 protected:
 	f2mc16_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock);
 
 	// device-level overrides
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	virtual void state_import(const device_state_entry &entry) override;
 	virtual void state_export(const device_state_entry &entry) override;
@@ -65,12 +66,13 @@ private:
 	address_space_config m_program_config;
 	address_space *m_program;
 
-	u16 m_pc, m_usp, m_ssp, m_ps, m_tmp16, m_tmpea, m_tmp16aux;
-	u8 m_pcb, m_dtb, m_usb, m_ssb, m_adb, m_dpr, m_tmp8, m_prefix;
-	u32 m_acc, m_temp, m_tmp32, m_tmp32aux;
+	u16 m_pc, m_usp, m_ssp, m_ps, m_tmp16, m_tmp16aux;
+	u8 m_pcb, m_dtb, m_usb, m_ssb, m_adb, m_dpr, m_tmp8, m_tmp8aux, m_shifted_carry, m_prefix;
+	u32 m_pcbase, m_acc, m_temp, m_tmp32, m_tmpea;
 	s32 m_icount;
-	u64 m_tmp64;
 	bool m_prefix_valid;
+	u16 m_irq_level;
+	bool m_rmw;
 
 	inline u8 read_8(u32 addr)
 	{
@@ -190,11 +192,26 @@ private:
 
 			case 3:
 			case 7:
-				return (m_usb<<16) | uBankAddr;
+				if (m_ps & F_S)
+					return (m_ssb<<16) | uBankAddr;
+				else
+					return (m_usb<<16) | uBankAddr;
 		}
 
 		// this can't happen, but GCC insists
 		return (m_dtb<<16) | uBankAddr;
+	}
+
+	// get the full 24 bit address for a short direct access
+	inline u32 getdirbank(u8 uDirAddr)
+	{
+		if (m_prefix_valid)
+		{
+			m_prefix_valid = false;
+			return (m_prefix<<16) | (m_dpr<<8) | uDirAddr;
+		}
+		else
+			return (m_dtb<<16) | (m_dpr<<8) | uDirAddr;
 	}
 
 	inline void push_8(u8 val)
@@ -321,51 +338,21 @@ private:
 
 	inline void doCMP_8(u8 lhs, u8 rhs)
 	{
-		u16 tmp16 = lhs - rhs;
-		setNZ_16(tmp16 & 0xff);
-		m_ps &= ~(F_C|F_V);
-		if (tmp16 & 0x100)
-		{
-			m_ps |= F_C;
-		}
-		if ((lhs ^ rhs) & (lhs ^ (tmp16 & 0xff)) & 0x80)
-		{
-			m_ps |= F_V;
-		}
+		(void)doSUB_8(lhs, rhs);
 	}
 	inline void doCMP_16(u16 lhs, u16 rhs)
 	{
-		u32 tmp32 = lhs - rhs;
-		setNZ_16(tmp32 & 0xffff);
-		m_ps &= ~(F_C|F_V);
-		if (tmp32 & 0x10000)
-		{
-			m_ps |= F_C;
-		}
-		if ((lhs ^ rhs) & (lhs ^ (tmp32 & 0xffff)) & 0x8000)
-		{
-			m_ps |= F_V;
-		}
+		(void)doSUB_16(lhs, rhs);
 	}
 	inline void doCMP_32(u32 lhs, u32 rhs)
 	{
-		u64 tmp64 = lhs - rhs;
-		setNZ_32(tmp64 & 0xffffffff);
-		m_ps &= ~(F_C|F_V);
-		if (tmp64 & 0x100000000)
-		{
-			m_ps |= F_C;
-		}
-		if ((lhs ^ rhs) & (lhs ^ (tmp64 & 0xffffffff)) & 0x80000000)
-		{
-			m_ps |= F_V;
-		}
+		(void)doSUB_32(lhs, rhs);
 	}
 
 	inline u8 doSUB_8(u8 lhs, u8 rhs)
 	{
-		u16 tmp16 = lhs - rhs;
-		setNZ_16(tmp16 & 0xff);
+		u16 tmp16 = u16(lhs) - u16(rhs);
+		setNZ_8(tmp16 & 0xff);
 		m_ps &= ~(F_C|F_V);
 		if (tmp16 & 0x100)
 		{
@@ -376,11 +363,11 @@ private:
 			m_ps |= F_V;
 		}
 
-		return m_tmp16 & 0xff;
+		return tmp16 & 0xff;
 	}
 	inline u16 doSUB_16(u16 lhs, u16 rhs)
 	{
-		u32 tmp32 = lhs - rhs;
+		u32 tmp32 = u32(lhs) - u32(rhs);
 		setNZ_16(tmp32 & 0xffff);
 		m_ps &= ~(F_C|F_V);
 		if (tmp32 & 0x10000)
@@ -396,20 +383,70 @@ private:
 	}
 	inline u32 doSUB_32(u32 lhs, u32 rhs)
 	{
-		u64 tmp64 = lhs - rhs;
+		u64 tmp64 = u64(lhs) - u64(rhs);
 		setNZ_32(tmp64 & 0xffffffff);
 		m_ps &= ~(F_C|F_V);
 		if (tmp64 & 0x100000000)
 		{
 			m_ps |= F_C;
 		}
-		if ((lhs ^ rhs) & (lhs ^ (tmp64 & 0xffffffff)) & 0x8000000)
+		if ((lhs ^ rhs) & (lhs ^ (tmp64 & 0xffffffff)) & 0x80000000)
 		{
 			m_ps |= F_V;
 		}
 
 		return tmp64 & 0xffffffff;
 	}
+
+	inline u8 doSUBC_8(u8 lhs, u8 rhs)
+	{
+		u16 tmp16 = u16(lhs) - u16(rhs) - u16((m_ps & F_C) ? 1 : 0);
+		setNZ_8(tmp16 & 0xff);
+		m_ps &= ~(F_C|F_V);
+		if (tmp16 & 0x100)
+		{
+			m_ps |= F_C;
+		}
+		if ((lhs ^ rhs) & (lhs ^ (tmp16 & 0xff)) & 0x80)
+		{
+			m_ps |= F_V;
+		}
+
+		return tmp16 & 0xff;
+	}
+	inline u16 doSUBC_16(u16 lhs, u16 rhs)
+	{
+		u32 tmp32 = u32(lhs) - u32(rhs) - u32((m_ps & F_C) ? 1 : 0);
+		setNZ_16(tmp32 & 0xffff);
+		m_ps &= ~(F_C|F_V);
+		if (tmp32 & 0x10000)
+		{
+			m_ps |= F_C;
+		}
+		if ((lhs ^ rhs) & (lhs ^ (tmp32 & 0xffff)) & 0x8000)
+		{
+			m_ps |= F_V;
+		}
+
+		return tmp32 & 0xffff;
+	}
+	inline u32 doSUBC_32(u32 lhs, u32 rhs)
+	{
+		u64 tmp64 = u64(lhs) - u64(rhs) - u64((m_ps & F_C) ? 1 : 0);
+		setNZ_32(tmp64 & 0xffffffff);
+		m_ps &= ~(F_C|F_V);
+		if (tmp64 & 0x100000000)
+		{
+			m_ps |= F_C;
+		}
+		if ((lhs ^ rhs) & (lhs ^ (tmp64 & 0xffffffff)) & 0x80000000)
+		{
+			m_ps |= F_V;
+		}
+
+		return tmp64 & 0xffffffff;
+	}
+
 	inline u8 doADD_8(u8 lhs, u8 rhs)
 	{
 		u16 tmp16 = lhs + rhs;
@@ -459,11 +496,212 @@ private:
 		return tmp64 & 0xffffffff;
 	}
 
+	inline u8 doADDC_8(u8 lhs, u8 rhs)
+	{
+		u16 tmp16 = lhs + rhs + ((m_ps & F_C) ? 1 : 0);
+		m_ps &= ~(F_C|F_V);
+		if ((tmp16 ^ lhs) & (tmp16 ^ rhs) & 0x80)
+		{
+			m_ps |= F_V;
+		}
+		if (tmp16 > 0xff)
+		{
+			m_ps |= F_C;
+		}
+		setNZ_8(tmp16 & 0xff);
+
+		return tmp16 & 0xff;
+	}
+	inline u16 doADDC_16(u16 lhs, u16 rhs)
+	{
+		u32 tmp32 = lhs + rhs + ((m_ps & F_C) ? 1 : 0);
+		m_ps &= ~(F_C|F_V);
+		if ((tmp32 ^ lhs) & (tmp32 ^ rhs) & 0x8000)
+		{
+			m_ps |= F_V;
+		}
+		if (tmp32 > 0xffff)
+		{
+			m_ps |= F_C;
+		}
+		setNZ_16(tmp32 & 0xffff);
+
+		return tmp32 & 0xffff;
+	}
+	inline u32 doADDC_32(u32 lhs, u32 rhs)
+	{
+		u64 tmp64 = lhs + rhs + ((m_ps & F_C) ? 1 : 0);
+		m_ps &= ~(F_C|F_V);
+		if ((tmp64 ^ lhs) & (tmp64 ^ rhs) & 0x80000000)
+		{
+			m_ps |= F_V;
+		}
+		if (tmp64 > 0xffffffff)
+		{
+			m_ps |= F_C;
+		}
+		setNZ_32(tmp64 & 0xffffffff);
+
+		return tmp64 & 0xffffffff;
+	}
+
+	inline u8 doINC_8(u8 val)
+	{
+		val++;
+		setNZ_8(val);
+		if (val == 0x80)
+			m_ps |= F_V;
+		else
+			m_ps &= ~F_V;
+
+		return val;
+	}
+	inline u16 doINC_16(u16 val)
+	{
+		val++;
+		setNZ_16(val);
+		if (val == 0x8000)
+			m_ps |= F_V;
+		else
+			m_ps &= ~F_V;
+
+		return val;
+	}
+	inline u32 doINC_32(u32 val)
+	{
+		val++;
+		setNZ_32(val);
+		if (val == 0x80000000)
+			m_ps |= F_V;
+		else
+			m_ps &= ~F_V;
+
+		return val;
+	}
+
+	inline u8 doDEC_8(u8 val)
+	{
+		val--;
+		setNZ_8(val);
+		if (val == 0x7f)
+			m_ps |= F_V;
+		else
+			m_ps &= ~F_V;
+
+		return val;
+	}
+	inline u16 doDEC_16(u16 val)
+	{
+		val--;
+		setNZ_16(val);
+		if (val == 0x7fff)
+			m_ps |= F_V;
+		else
+			m_ps &= ~F_V;
+
+		return val;
+	}
+	inline u32 doDEC_32(u32 val)
+	{
+		val--;
+		setNZ_32(val);
+		if (val == 0x7fffffff)
+			m_ps |= F_V;
+		else
+			m_ps &= ~F_V;
+
+		return val;
+	}
+
 	inline void take_branch()
 	{
 		u8 tmp8 = read_8((m_pcb << 16) | (m_pc+1));
 		m_pc = m_pc + 2 + (s8)tmp8;
 		m_icount -= 4;
+	}
+
+	inline void movsi(u8 dst, u8 src)
+	{
+		if (read_rwX(0) > 0)
+		{
+			m_icount -= 4;
+			while (uint16_t n = read_rwX(0))
+			{
+				u16 al = (m_acc & 0xffff);
+				u16 ah = (m_acc >> 16) & 0xffff;
+				m_tmp8 = read_8((src<<16) | al);
+				write_8((dst<<16) | ah, m_tmp8);
+				al++;
+				ah++;
+				m_acc = (ah<<16) | al;
+				write_rwX(0, n - 1);
+				m_icount -= 8;
+			}
+		}
+		else
+		{
+			m_icount -= 5;
+		}
+		m_pc += 2;
+	}
+
+	inline void movswi(u8 dst, u8 src)
+	{
+		if (read_rwX(0) > 0)
+		{
+			m_icount -= 4;
+			while (uint16_t n = read_rwX(0))
+			{
+				u16 al = (m_acc & 0xffff);
+				u16 ah = (m_acc >> 16) & 0xffff;
+				m_tmp16 = read_16((src<<16) | al);
+				write_16((dst<<16) | ah, m_tmp16);
+				al += 2;
+				ah += 2;
+				m_acc = (ah<<16) | al;
+				write_rwX(0, n - 1);
+				m_icount -= 8;
+			}
+		}
+		else
+		{
+			m_icount -= 5;
+		}
+		m_pc += 2;
+	}
+
+	inline void filsi(u8 dst)
+	{
+		m_icount -= 6;
+		while (uint16_t n = read_rwX(0))
+		{
+			u16 al = (m_acc & 0xffff);
+			u16 ah = (m_acc >> 16) & 0xffff;
+			write_8((dst<<16) | ah, al & 0xff);
+			ah++;
+			m_acc = (ah<<16) | al;
+			write_rwX(0, n - 1);
+			setNZ_8(m_acc & 0xff);
+			m_icount -= 6;
+		}
+		m_pc += 2;
+	}
+
+	inline void filswi(u8 dst)
+	{
+		m_icount -= 6;
+		while (uint16_t n = read_rwX(0))
+		{
+			u16 al = (m_acc & 0xffff);
+			u16 ah = (m_acc >> 16) & 0xffff;
+			write_16((dst<<16) | ah, al);
+			ah += 2;
+			m_acc = (ah<<16) | al;
+			write_rwX(0, n - 1);
+			setNZ_16(m_acc & 0xffff);
+			m_icount -= 6;
+		}
+		m_pc += 2;
 	}
 
 	void opcodes_bo6c(u8 operand);
@@ -478,15 +716,15 @@ private:
 	void opcodes_ea76(u8 operand);
 	void opcodes_ea77(u8 operand);
 	void opcodes_ea78(u8 operand);
-	void opcodes_rwi7a(u8 operand);
-	void opcodes_rwi7b(u8 operand);
+	void opcodes_rwiea79(u8 operand);
+	void opcodes_riea7a(u8 operand);
+	void opcodes_rwiea7b(u8 operand);
+	void opcodes_eari7c(u8 operand);
+	void opcodes_earwi7d(u8 operand);
+	void opcodes_rwiea7f(u8 operand);
 
-	void set_irq(int vector, int level);
-	void clear_irq(int vector);
-	void take_irq(int vector, int level);
-
-	int m_vector_level[256];
-	int m_outstanding_irqs;
+	void take_irq();
+	void take_irq_vector(uint8_t irq_vector);
 };
 
 DECLARE_DEVICE_TYPE(F2MC16, f2mc16_device)

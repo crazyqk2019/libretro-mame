@@ -9,12 +9,12 @@
 
 *******************************************************************************/
 
-#ifndef MAME_BUS_TI99_INTERNAL_BRAM_H
-#define MAME_BUS_TI99_INTERNAL_BRAM_H
+#ifndef MAME_BUS_TI99_INTERNAL_BUFFRAM_H
+#define MAME_BUS_TI99_INTERNAL_BUFFRAM_H
 
 #pragma once
 
-namespace bus { namespace ti99 { namespace internal {
+namespace bus::ti99::internal {
 
 // =========== Buffered RAM ================
 class buffered_ram_device : public device_t, public device_nvram_interface
@@ -27,24 +27,23 @@ public:
 	uint8_t read(offs_t offset)         { return m_mem[offset % m_size]; }
 	void write(offs_t offset, uint8_t data)  { m_mem[offset % m_size] = data; }
 
-	void set_buffered(bool on) { m_buffered = on; }
+	void set_buffered(bool on) { nvram_enable_backup(on); }
 
 private:
-	void device_start() override;
+	virtual void device_start() override ATTR_COLD;
 
 	// derived class overrides
-	void nvram_default() override;
-	void nvram_read(emu_file &file) override;
-	void nvram_write(emu_file &file) override;
+	virtual void nvram_default() override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
 
-	bool m_buffered;
 	int m_size;
 	std::unique_ptr<u8 []>      m_mem;
 };
 
 
-} } } // end namespace bus::ti99::internal
+} // end namespace bus::ti99::internal
 
 DECLARE_DEVICE_TYPE_NS(BUFF_RAM, bus::ti99::internal, buffered_ram_device)
 
-#endif // MAME_BUS_TI99_INTERNAL_BRAM_H
+#endif // MAME_BUS_TI99_INTERNAL_BUFFRAM_H

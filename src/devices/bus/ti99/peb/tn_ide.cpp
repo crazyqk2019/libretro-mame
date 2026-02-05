@@ -122,19 +122,19 @@
 #include "emu.h"
 #include "tn_ide.h"
 
-#define LOG_WARN       (1U<<1)
-#define LOG_CRU        (1U<<2)
-#define LOG_RTC        (1U<<3)
-#define LOG_XRAM       (1U<<4)
-#define LOG_SRAM       (1U<<5)
-#define LOG_ATA        (1U<<6)
-#define LOG_SRAMH      (1U<<7)
+#define LOG_WARN       (1U << 1)
+#define LOG_CRU        (1U << 2)
+#define LOG_RTC        (1U << 3)
+#define LOG_XRAM       (1U << 4)
+#define LOG_SRAM       (1U << 5)
+#define LOG_ATA        (1U << 6)
+#define LOG_SRAMH      (1U << 7)
 
-#define VERBOSE ( LOG_GENERAL | LOG_WARN )
+#define VERBOSE (LOG_GENERAL | LOG_WARN)
 
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(TI99_IDE, bus::ti99::peb, nouspikel_ide_card_device, "ti99_ide", "Nouspikel IDE interface card")
+DEFINE_DEVICE_TYPE(TI99_IDE, bus::ti99::peb::nouspikel_ide_card_device, "ti99_ide", "Nouspikel IDE interface card")
 
 #define CLOCK65_TAG "rtc65271"
 #define CLOCK47_TAG "bq4847"
@@ -146,7 +146,7 @@ DEFINE_DEVICE_TYPE_NS(TI99_IDE, bus::ti99::peb, nouspikel_ide_card_device, "ti99
 #define ATALATCHODD_TAG "atalatch_odd"
 #define RAM512_TAG "sram512"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 enum
 {
@@ -178,7 +178,8 @@ nouspikel_ide_card_device::nouspikel_ide_card_device(const machine_config &mconf
 	m_ideint(false),
 	m_mode(MODE_OFF),
 	m_page(0),
-	m_rtctype(0)
+	m_rtctype(0),
+	m_genmod(false)
 {
 }
 
@@ -474,6 +475,9 @@ void nouspikel_ide_card_device::decode(offs_t offset, bool& mmap, bool& sramsel,
 {
 	bool inspace = false;
 
+	// In a normal Geneve, assume AME=1, AMD=0
+	if (!m_genmod) offset = ((offset & 0x07ffff) | 0x100000);
+
 	// A0=0
 	if (m_mode == MODE_TI) inspace = ((offset & 0x8000)==0);
 	else
@@ -525,20 +529,7 @@ void nouspikel_ide_card_device::crureadz(offs_t offset, uint8_t *value)
 			bit = m_srammap? 1:0;
 			break;
 		case 2:
-			if (m_rtctype==RTC65)
-				bit = (m_rtc65->intrq_r()==ASSERT_LINE)? 0:1;
-			else
-			{
-				if (m_rtctype==RTC47)
-					bit = (m_rtc47->intrq_r()==ASSERT_LINE)? 0:1;
-				else
-				{
-					if (m_rtctype==RTC42)
-						bit = (m_rtc42->intrq_r()==ASSERT_LINE)? 0:1;
-					else
-						bit = (m_rtc52->intrq_r()==ASSERT_LINE)? 0:1;
-				}
-			}
+			bit = BIT(m_rtc_int, m_rtctype);
 			break;
 		case 3:
 			bit = 1;
@@ -602,18 +593,25 @@ void nouspikel_ide_card_device::cruwrite(offs_t offset, uint8_t data)
 	}
 }
 
-WRITE_LINE_MEMBER(nouspikel_ide_card_device::clock_interrupt_callback)
+template<int rtctype>
+void nouspikel_ide_card_device::rtc_int_callback(int state)
 {
-	m_slot->set_inta(state);
+	if (state)
+		m_rtc_int |= 1 << rtctype;
+	else
+		m_rtc_int &= ~(1 << rtctype);
+
+	if (rtctype == m_rtctype)
+		m_slot->set_inta(state ? CLEAR_LINE : ASSERT_LINE);
 }
 
-WRITE_LINE_MEMBER(nouspikel_ide_card_device::ide_interrupt_callback)
+void nouspikel_ide_card_device::ide_interrupt_callback(int state)
 {
 	m_ideint = (state==ASSERT_LINE);
 	if (m_crulatch->q6_r()==1) m_slot->set_inta(state);
 }
 
-WRITE_LINE_MEMBER(nouspikel_ide_card_device::resetdr_callback)
+void nouspikel_ide_card_device::resetdr_callback(int state)
 {
 	if (m_crulatch->q6_r()==1 && (state==0))
 		// not implemented
@@ -628,10 +626,10 @@ void nouspikel_ide_card_device::device_add_mconfig(machine_config &config)
 	BQ4842(config, m_rtc42, 0);
 	BQ4852(config, m_rtc52, 0);
 
-	m_rtc65->interrupt_cb().set(FUNC(nouspikel_ide_card_device::clock_interrupt_callback));
-	m_rtc47->interrupt_cb().set(FUNC(nouspikel_ide_card_device::clock_interrupt_callback));
-	m_rtc42->interrupt_cb().set(FUNC(nouspikel_ide_card_device::clock_interrupt_callback));
-	m_rtc52->interrupt_cb().set(FUNC(nouspikel_ide_card_device::clock_interrupt_callback));
+	m_rtc65->interrupt_cb().set(FUNC(nouspikel_ide_card_device::rtc_int_callback<RTC65>)).invert();
+	m_rtc47->int_handler().set(FUNC(nouspikel_ide_card_device::rtc_int_callback<RTC47>));
+	m_rtc42->interrupt_cb().set(FUNC(nouspikel_ide_card_device::rtc_int_callback<RTC42>)).invert();
+	m_rtc52->interrupt_cb().set(FUNC(nouspikel_ide_card_device::rtc_int_callback<RTC52>)).invert();
 
 	ATA_INTERFACE(config, m_ata).options(ata_devices, "hdd", nullptr, false);
 	m_ata->irq_handler().set(FUNC(nouspikel_ide_card_device::ide_interrupt_callback));
@@ -654,6 +652,7 @@ void nouspikel_ide_card_device::device_start()
 {
 	save_item(NAME(m_ideint));
 	save_item(NAME(m_page));
+	save_item(NAME(m_rtc_int));
 }
 
 void nouspikel_ide_card_device::device_reset()
@@ -666,13 +665,14 @@ void nouspikel_ide_card_device::device_reset()
 	m_mode = ioport("MODE")->read();
 	m_srammap = (ioport("MAPMODE")->read()!=0);
 	m_rtctype = rtype[ioport("RTC")->read()];
+	m_genmod = (ioport("GENMOD")->read() != 0);
 
 	// The 65271 option does not support buffered SRAM; only the BQ4847
 	// can drive a buffered external RAM; the other two chips have internal SRAM
 	m_sram->set_buffered(m_rtctype == RTC47);
 
 	// Only activate the selected RTC
-	m_rtc47->connect_osc(ioport("RTC")->read()==1);
+	m_rtc47->set_unscaled_clock((ioport("RTC")->read()==1) ? 32768 : 0);
 	m_rtc42->connect_osc(ioport("RTC")->read()==2);
 	m_rtc52->connect_osc(ioport("RTC")->read()==3);
 }
@@ -689,21 +689,27 @@ INPUT_CHANGED_MEMBER( nouspikel_ide_card_device::mode_changed )
 INPUT_PORTS_START( tn_ide )
 
 	PORT_START("RTC")
-	PORT_CONFNAME(0x03, 0, "RTC chip")
+	PORT_CONFNAME(0x03, 1, "RTC chip")
 		PORT_CONFSETTING(0, "RTC-65271")
 		PORT_CONFSETTING(1, "BQ4847 (ext SRAM)")
 		PORT_CONFSETTING(2, "BQ4842 (128K)")
 		PORT_CONFSETTING(3, "BQ4852 (512K)")
 
+	// When used in a normal Geneve, AME/AMD lines are set to (1,0)
+	PORT_START("GENMOD")
+	PORT_CONFNAME(0x01, 0, "Genmod decoding")
+		PORT_CONFSETTING(0, DEF_STR( Off ))
+		PORT_CONFSETTING(1, DEF_STR( On ))
+
 	// The switch should be open (1) on powerup for BQ clock chips
 	PORT_START("MAPMODE")
-	PORT_DIPNAME(0x1, 1, "Map at boot time") PORT_CHANGED_MEMBER(DEVICE_SELF, nouspikel_ide_card_device, mode_changed, 0)
+	PORT_DIPNAME(0x1, 1, "Map at boot time") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nouspikel_ide_card_device::mode_changed), 0)
 		PORT_DIPSETTING(0, "RTC")
 		PORT_DIPSETTING(1, "SRAM")
 
 	// Set to off as default, because random contents in SRAM may lead to lockup
 	PORT_START("MODE")
-	PORT_DIPNAME(0x3, MODE_OFF, "Card mode") PORT_CHANGED_MEMBER(DEVICE_SELF, nouspikel_ide_card_device, mode_changed, 1)
+	PORT_DIPNAME(0x3, MODE_OFF, "Card mode") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nouspikel_ide_card_device::mode_changed), 1)
 		PORT_DIPSETTING(MODE_OFF, "Off")
 		PORT_DIPSETTING(MODE_GENEVE, "Geneve")
 		PORT_DIPSETTING(MODE_TI, "TI")
@@ -733,4 +739,4 @@ ioport_constructor nouspikel_ide_card_device::device_input_ports() const
 	return INPUT_PORTS_NAME(tn_ide);
 }
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb

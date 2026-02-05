@@ -57,11 +57,11 @@
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-DEFINE_DEVICE_TYPE_NS(A1200_KBD, bus::amiga::keyboard, a1200_kbd_device, "a1200kbd_rb", "Amiga 1200 Keyboard Rev B")
+DEFINE_DEVICE_TYPE(A1200_KBD, bus::amiga::keyboard::a1200_kbd_device, "a1200kbd_rb", "Amiga 1200 Keyboard Rev B")
 
 
 
-namespace bus { namespace amiga { namespace keyboard {
+namespace bus::amiga::keyboard {
 
 namespace {
 
@@ -83,7 +83,7 @@ INPUT_PORTS_START(a1200_us_keyboard)
 
 	// FIXME: split compact mode into a separate device without the numeric keypad
 	PORT_START("IRQ")
-	PORT_CONFNAME(0x01, 0x01, "Layout") PORT_CHANGED_MEMBER(DEVICE_SELF, a1200_kbd_device, layout_changed, 0)
+	PORT_CONFNAME(0x01, 0x01, "Layout") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(a1200_kbd_device::layout_changed), 0)
 	PORT_CONFSETTING(0x01, "Full Size")
 	PORT_CONFSETTING(0x00, "Compact")
 INPUT_PORTS_END
@@ -114,7 +114,7 @@ a1200_kbd_device::a1200_kbd_device(machine_config const &mconfig, char const *ta
 {
 }
 
-WRITE_LINE_MEMBER(a1200_kbd_device::kdat_w)
+void a1200_kbd_device::kdat_w(int state)
 {
 	if (bool(state) != m_host_kdat)
 	{
@@ -167,7 +167,7 @@ void a1200_kbd_device::mpu_portc_w(offs_t offset, u8 data, u8 mem_mask)
 	m_led_kbd_caps = BIT(~data, 7);
 }
 
-WRITE_LINE_MEMBER(a1200_kbd_device::mpu_tcmp)
+void a1200_kbd_device::mpu_tcmp(int state)
 {
 	m_host->krst_w(state);
 }
@@ -211,4 +211,4 @@ void a1200_kbd_device::device_reset_after_children()
 	m_mpu->set_input_line(M68HC05_IRQ_LINE, BIT(ioport("IRQ")->read(), 0) ? CLEAR_LINE : ASSERT_LINE);
 }
 
-} } } // namespace bus::amiga::keyboard
+} // namespace bus::amiga::keyboard

@@ -5,128 +5,74 @@
     speaker.cpp
 
     Speaker output sound device.
+    Microphone input sound device.
 
 ***************************************************************************/
 
 #include "emu.h"
+#include "emuopts.h"
 #include "speaker.h"
 
 
 
-//**************************************************************************
-//  GLOBAL VARIABLES
-//**************************************************************************
-
-// device type definition
 DEFINE_DEVICE_TYPE(SPEAKER, speaker_device, "speaker", "Speaker")
+DEFINE_DEVICE_TYPE(MICROPHONE, microphone_device, "microphone", "Microphone")
 
+sound_io_device &sound_io_device::set_position(u32 channel, double x, double y, double z)
+{
+	if(channel >= m_positions.size())
+		fatalerror("%s: Requested channel %d on %d channel device\n", tag(), channel, m_positions.size());
+	m_positions[channel].m_x = x;
+	m_positions[channel].m_y = y;
+	m_positions[channel].m_z = z;
+	return *this;
+}
 
+sound_io_device &sound_io_device::set_position(u32 channel, const osd::channel_position &pos)
+{
+	if(channel >= m_positions.size())
+		fatalerror("%s: Requested channel %d on %d channel device\n", tag(), channel, m_positions.size());
+	m_positions[channel] = pos;
+	return *this;
+}
 
-//**************************************************************************
-//  LIVE SPEAKER DEVICE
-//**************************************************************************
-
-//-------------------------------------------------
-//  speaker_device - constructor
-//-------------------------------------------------
-
-speaker_device::speaker_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: device_t(mconfig, SPEAKER, tag, owner, clock)
-	, device_mixer_interface(mconfig, *this)
-	, m_x(0.0)
-	, m_y(0.0)
-	, m_z(0.0)
-#ifdef MAME_DEBUG
-	, m_max_sample(0)
-	, m_clipped_samples(0)
-	, m_total_samples(0)
-#endif
+sound_io_device::sound_io_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 channels) :
+	device_t(mconfig, type, tag, owner, 0),
+	device_sound_interface(mconfig, *this),
+	m_positions(channels ? channels : 1)
 {
 }
 
 
-//-------------------------------------------------
-//  ~speaker_device - destructor
-//-------------------------------------------------
+sound_io_device::~sound_io_device()
+{
+}
 
 speaker_device::~speaker_device()
 {
-#ifdef MAME_DEBUG
-	// log the maximum sample values for all speakers
-	if (m_max_sample > 0)
-		osd_printf_debug("Speaker \"%s\" - max = %d (gain *= %f) - %d%% samples clipped\n", tag(), m_max_sample, 32767.0 / (m_max_sample ? m_max_sample : 1), (int)((double)m_clipped_samples * 100.0 / m_total_samples));
-#endif
 }
 
-
-//-------------------------------------------------
-//  mix - mix in samples from the speaker's stream
-//-------------------------------------------------
-
-void speaker_device::mix(s32 *leftmix, s32 *rightmix, int &samples_this_update, bool suppress)
+microphone_device::~microphone_device()
 {
-	// skip if no stream
-	if (m_mixer_stream == nullptr)
-		return;
-
-	// update the stream, getting the start/end pointers around the operation
-	int numsamples;
-	const stream_sample_t *stream_buf = m_mixer_stream->output_since_last_update(0, numsamples);
-
-	// set or assert that all streams have the same count
-	if (samples_this_update == 0)
-	{
-		samples_this_update = numsamples;
-
-		// reset the mixing streams
-		std::fill_n(leftmix, samples_this_update, 0);
-		std::fill_n(rightmix, samples_this_update, 0);
-	}
-	assert(samples_this_update == numsamples);
-
-#ifdef MAME_DEBUG
-	// debug version: keep track of the maximum sample
-	for (int sample = 0; sample < samples_this_update; sample++)
-	{
-		if (stream_buf[sample] > m_max_sample)
-			m_max_sample = stream_buf[sample];
-		else if (-stream_buf[sample] > m_max_sample)
-			m_max_sample = -stream_buf[sample];
-		if (stream_buf[sample] > 32767 || stream_buf[sample] < -32768)
-			m_clipped_samples++;
-		m_total_samples++;
-	}
-#endif
-
-	// mix if sound is enabled
-	if (!suppress)
-	{
-		// if the speaker is centered, send to both left and right
-		if (m_x == 0)
-			for (int sample = 0; sample < samples_this_update; sample++)
-			{
-				leftmix[sample] += stream_buf[sample];
-				rightmix[sample] += stream_buf[sample];
-			}
-
-		// if the speaker is to the left, send only to the left
-		else if (m_x < 0)
-			for (int sample = 0; sample < samples_this_update; sample++)
-				leftmix[sample] += stream_buf[sample];
-
-		// if the speaker is to the right, send only to the right
-		else
-			for (int sample = 0; sample < samples_this_update; sample++)
-				rightmix[sample] += stream_buf[sample];
-	}
 }
 
-
-//-------------------------------------------------
-//  device_start - handle device startup
-//-------------------------------------------------
 
 void speaker_device::device_start()
 {
-	// dummy save to make device.c happy
+	m_stream = stream_alloc(m_positions.size(), 0, machine().sample_rate());
+}
+
+void microphone_device::device_start()
+{
+	m_stream = stream_alloc(0, m_positions.size(), machine().sample_rate());
+}
+
+void speaker_device::sound_stream_update(sound_stream &stream)
+{
+	machine().sound().output_push(m_id, stream);
+}
+
+void microphone_device::sound_stream_update(sound_stream &stream)
+{
+	machine().sound().input_get(m_id, stream);
 }

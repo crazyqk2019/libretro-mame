@@ -38,6 +38,8 @@
 #include "emu.h"
 #include "cc500.h"
 
+#include <algorithm>
+
 
 //**************************************************************************
 //  DEVICE DEFINITIONS
@@ -61,7 +63,7 @@ ROM_END
 
 void bbc_cc500_device::device_add_mconfig(machine_config &config)
 {
-	VIA6522(config, m_via, DERIVED_CLOCK(1, 1));
+	MOS6522(config, m_via, DERIVED_CLOCK(1, 1));
 	m_via->readpa_handler().set(m_userport, FUNC(bbc_userport_slot_device::pb_r));
 	m_via->writepa_handler().set(m_userport, FUNC(bbc_userport_slot_device::pb_w));
 	m_via->irq_handler().set(DEVICE_SELF_OWNER, FUNC(bbc_1mhzbus_slot_device::irq_w));
@@ -110,9 +112,9 @@ bbc_cc500_device::bbc_cc500_device(const machine_config &mconfig, const char *ta
 
 void bbc_cc500_device::device_start()
 {
-	memset(m_palette_ram, 0, sizeof(m_palette_ram));
+	std::fill(std::begin(m_palette_ram), std::end(m_palette_ram), rgb_t(0));
 
-	/* register for save states */
+	// register for save states
 	save_item(NAME(m_palette_ram));
 }
 

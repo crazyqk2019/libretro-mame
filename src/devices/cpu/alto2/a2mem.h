@@ -12,8 +12,8 @@
 #define ALTO2_IO_PAGE_SIZE      0001000                     //!< size of the memory mapped io range
 
 #else   // ALTO2_DEFINE_CONSTANTS
-#ifndef _A2MEM_H_
-#define _A2MEM_H_
+#ifndef MAME_CPU_ALTO2_A2MEM_H
+#define MAME_CPU_ALTO2_A2MEM_H
 //! memory access mode
 enum {
 	ALTO2_MEM_NONE,
@@ -25,14 +25,14 @@ enum {
 };
 
 struct {
-	uint32_t size;                        //!< main memory size (64K or 128K)
-	std::unique_ptr<uint32_t[]> ram;      //!< main memory organized as double-words
-	std::unique_ptr<uint8_t[]> hpb;       //!< Hamming Code bits (6) and Parity bits (1) per double word
-	uint32_t mar;                         //!< memory address register
-	uint32_t rmdd;                        //!< read memory data double-word
-	uint32_t wmdd;                        //!< write memory data double-word
-	uint32_t md;                          //!< memory data register
-	uint64_t cycle;                       //!< cycle when the memory address register was loaded
+	uint32_t size = 0;                  //!< main memory size (64K or 128K)
+	std::unique_ptr<uint32_t []> ram;   //!< main memory organized as double-words
+	std::unique_ptr<uint8_t []> hpb;    //!< Hamming Code bits (6) and Parity bits (1) per double word
+	uint32_t mar = 0;                   //!< memory address register
+	uint32_t rmdd = 0;                  //!< read memory data double-word
+	uint32_t wmdd = 0;                  //!< write memory data double-word
+	uint32_t md = 0;                    //!< memory data register
+	uint64_t cycle = 0;                 //!< cycle when the memory address register was loaded
 
 	/**
 	 * @brief memory access under the way if non-zero
@@ -41,11 +41,11 @@ struct {
 	 * 2: memory access even word (MEM_RAM)
 	 * 3: memory access odd word (MEM_RAM | MEM_ODD)
 	 */
-	int access;
-	bool error;                         //!< non-zero after a memory error was detected
-	uint32_t mear;                        //!< memory error address register
-	uint32_t mesr;                        //!< memory error status register
-	uint32_t mecr;                        //!< memory error control register
+	int access = 0;
+	bool error = false;                 //!< non-zero after a memory error was detected
+	uint32_t mear = 0;                  //!< memory error address register
+	uint32_t mesr = 0;                  //!< memory error status register
+	uint32_t mecr = 0;                  //!< memory error control register
 }   m_mem;
 
 /**
@@ -135,5 +135,5 @@ void watch_read(uint32_t addr, uint32_t data);
 void init_memory();                             //!< initialize the memory system
 void exit_memory();                             //!< deinitialize the memory system
 void reset_memory();                            //!< reset the memory system
-#endif // _A2MEM_H_
+#endif // MAME_CPU_ALTO2_A2MEM_H
 #endif  // ALTO2_DEFINE_CONSTANTS

@@ -125,7 +125,7 @@ void isa8_ibm_mfc_device::io_map(address_map &map)
 {
 	map.unmap_value_high();
 	map.global_mask(0xff);
-	map(0x00, 0x01).rw(m_ym2151, FUNC(ym2151_device::read), FUNC(ym2151_device::write));
+	map(0x00, 0x01).rw(m_ym2164, FUNC(ym2164_device::read), FUNC(ym2164_device::write));
 	map(0x10, 0x10).rw("d71051", FUNC(i8251_device::data_r), FUNC(i8251_device::data_w));
 	map(0x11, 0x11).rw("d71051", FUNC(i8251_device::status_r), FUNC(i8251_device::control_w));
 	map(0x20, 0x23).rw("d71055c_1", FUNC(i8255_device::read), FUNC(i8255_device::write));
@@ -235,13 +235,13 @@ void isa8_ibm_mfc_device::ppi1_o_c(uint8_t data)
 //  D8253 PIT
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( isa8_ibm_mfc_device::d8253_out0 )
+void isa8_ibm_mfc_device::d8253_out0(int state)
 {
 	if (m_tcr & TCR_TAE)
 		set_pc_interrupt(PC_IRQ_TIMERA, 1);
 }
 
-WRITE_LINE_MEMBER( isa8_ibm_mfc_device::d8253_out1 )
+void isa8_ibm_mfc_device::d8253_out1(int state)
 {
 	if (m_tcr & TCR_TBE)
 		set_pc_interrupt(PC_IRQ_TIMERB, 1);
@@ -252,7 +252,7 @@ WRITE_LINE_MEMBER( isa8_ibm_mfc_device::d8253_out1 )
 //  uPD71051 USART
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( isa8_ibm_mfc_device::write_usart_clock )
+void isa8_ibm_mfc_device::write_usart_clock(int state)
 {
 	m_d71051->write_txc(state);
 	m_d71051->write_rxc(state);
@@ -263,7 +263,7 @@ WRITE_LINE_MEMBER( isa8_ibm_mfc_device::write_usart_clock )
 //-------------------------------------------------
 
 
-WRITE_LINE_MEMBER(isa8_ibm_mfc_device::ibm_mfc_ym_irq)
+void isa8_ibm_mfc_device::ibm_mfc_ym_irq(int state)
 {
 	set_z80_interrupt(Z80_IRQ_YM, state);
 }
@@ -315,7 +315,7 @@ void isa8_ibm_mfc_device::ibm_mfc_w(offs_t offset, uint8_t data)
 		case 0x2:
 		case 0x3:
 		{
-			machine().scheduler().boost_interleave(attotime::zero, attotime::from_usec(1000));
+			machine().scheduler().perfect_quantum(attotime::from_usec(1000));
 			m_d71055c_0->write(offset, data);
 			break;
 		}
@@ -403,12 +403,11 @@ void isa8_ibm_mfc_device::device_add_mconfig(machine_config &config)
 	m_d8253->set_clk<2>(XTAL(4'000'000) / 2);
 	m_d8253->out_handler<2>().set(m_d8253, FUNC(pit8253_device::write_clk1));
 
-	SPEAKER(config, "ymleft").front_left();
-	SPEAKER(config, "ymright").front_right();
-	YM2164(config, m_ym2151, XTAL(4'000'000));
-	m_ym2151->irq_handler().set(FUNC(isa8_ibm_mfc_device::ibm_mfc_ym_irq));
-	m_ym2151->add_route(0, "ymleft", 1.00);
-	m_ym2151->add_route(1, "ymright", 1.00);
+	SPEAKER(config, "ym", 2).front();
+	YM2164(config, m_ym2164, XTAL(4'000'000));
+	m_ym2164->irq_handler().set(FUNC(isa8_ibm_mfc_device::ibm_mfc_ym_irq));
+	m_ym2164->add_route(0, "ym", 1.00, 0);
+	m_ym2164->add_route(1, "ym", 1.00, 1);
 }
 
 
@@ -446,7 +445,7 @@ isa8_ibm_mfc_device::isa8_ibm_mfc_device(const machine_config &mconfig, const ch
 	device_isa8_card_interface(mconfig, *this),
 	m_tcr(0), m_pc_ppi_c(0), m_z80_ppi_c(0), m_pc_irq_state(0), m_z80_irq_state(0),
 	m_cpu(*this, "ibm_mfc"),
-	m_ym2151(*this, "ym2151"),
+	m_ym2164(*this, "ym2164"),
 	m_d8253(*this, "d8253"),
 	m_d71051(*this, "d71051"),
 	m_d71055c_0(*this, "d71055c_0"),

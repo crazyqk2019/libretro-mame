@@ -1,5 +1,5 @@
 // license:BSD-3-Clause
-// copyright-holders:Aaron Giles
+// copyright-holders:Andrew Gardner, Vas Crabb
 /*********************************************************************
 
     dvbpoints.cpp
@@ -9,12 +9,14 @@
 ***************************************************************************/
 
 #include "emu.h"
-#include "debugger.h"
 #include "dvbpoints.h"
+
+#include "debugcpu.h"
 #include "points.h"
 
 #include <algorithm>
 #include <iomanip>
+#include <locale>
 
 
 
@@ -71,7 +73,7 @@ static bool cConditionDescending(const debug_breakpoint *a, const debug_breakpoi
 
 static bool cActionAscending(const debug_breakpoint *a, const debug_breakpoint *b)
 {
-	return strcmp(a->action(), b->action()) < 0;
+	return a->action() < b->action();
 }
 
 static bool cActionDescending(const debug_breakpoint *a, const debug_breakpoint *b)
@@ -122,11 +124,11 @@ void debug_view_breakpoints::enumerate_sources()
 	m_source_list.clear();
 
 	// iterate over devices with disassembly interfaces
-	for (device_disasm_interface &dasm : disasm_interface_iterator(machine().root_device()))
+	for (device_disasm_interface &dasm : disasm_interface_enumerator(machine().root_device()))
 	{
 		m_source_list.emplace_back(
 				std::make_unique<debug_view_source>(
-					util::string_format("%s '%s'", dasm.device().name(), dasm.device().tag()),
+					util::string_format(std::locale::classic(), "%s '%s'", dasm.device().name(), dasm.device().tag()),
 					&dasm.device()));
 	}
 
@@ -217,7 +219,7 @@ void debug_view_breakpoints::view_update()
 	gather_breakpoints();
 
 	// Set the view region so the scroll bars update
-	m_total.x = tableBreaks[ARRAY_LENGTH(tableBreaks) - 1];
+	m_total.x = tableBreaks[std::size(tableBreaks) - 1];
 	m_total.y = m_buffer.size() + 1;
 	if (m_total.y < 10)
 		m_total.y = 10;
@@ -225,7 +227,8 @@ void debug_view_breakpoints::view_update()
 	// Draw
 	debug_view_char     *dest = &m_viewdata[0];
 	util::ovectorstream linebuf;
-	linebuf.reserve(ARRAY_LENGTH(tableBreaks) - 1);
+	linebuf.imbue(std::locale::classic());
+	linebuf.reserve(std::size(tableBreaks) - 1);
 
 	// Header
 	if (m_visible.y > 0)

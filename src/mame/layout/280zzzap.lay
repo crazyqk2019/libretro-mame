@@ -1,8 +1,11 @@
 <?xml version="1.0"?>
 <!--
-license:CC0
+license:CC0-1.0
 -->
 <mamelayout version="2">
+
+	<element name="nothing"><rect><color alpha="0" /></rect></element>
+
 	<element name="overlay">
 		<rect>
 			<bounds left="0" top="0" right="260" bottom="224" />
@@ -63,40 +66,104 @@ license:CC0
 	</element>
 
 
-	<view name="Color Overlay + Shifter-R">
+	<view name="Color Overlay + Shifter-R Overlay" showpointers="no">
 		<screen index="0">
 			<bounds x="0" y="0" width="640" height="480" />
 		</screen>
-		<overlay name="overlay" element="overlay">
-			<bounds x="0" y="0" width="640" height="480" />
-		</overlay>
-
-		<bezel element="shifter" inputtag="IN0" inputmask="0x10">
-			<bounds x="606" y="414" width="32" height="64" />
-			<color alpha="0.6" />
-		</bezel>
+		<collection name="Overlay">
+			<element ref="overlay" blend="multiply">
+				<bounds x="0" y="0" width="640" height="480" />
+			</element>
+		</collection>
+		<collection name="Shifter">
+			<element ref="shifter" inputtag="IN0" inputmask="0x10">
+				<bounds x="606" y="414" width="32" height="64" />
+				<color alpha="0.6" />
+			</element>
+			<collection name="Opaque Shifter" visible="no">
+				<element ref="shifter" inputtag="IN0" inputmask="0x10">
+					<bounds x="606" y="414" width="32" height="64" />
+				</element>
+			</collection>
+			<element ref="nothing" clickthrough="no"> <!-- block clickable input -->
+				<bounds x="606" y="414" width="32" height="64" />
+			</element>
+		</collection>
 	</view>
 
-	<view name="Color Overlay + Shifter-L">
+	<view name="Color Overlay + Shifter-R Off-Screen" showpointers="no">
 		<screen index="0">
 			<bounds x="0" y="0" width="640" height="480" />
 		</screen>
-		<overlay name="overlay" element="overlay">
-			<bounds x="0" y="0" width="640" height="480" />
-		</overlay>
-
-		<bezel element="shifter" inputtag="IN0" inputmask="0x10">
-			<bounds x="2" y="414" width="32" height="64" />
-			<color alpha="0.6" />
-		</bezel>
+		<collection name="Overlay">
+			<element ref="overlay" blend="multiply">
+				<bounds x="0" y="0" width="640" height="480" />
+			</element>
+		</collection>
+		<collection name="Shifter">
+			<element ref="shifter" inputtag="IN0" inputmask="0x10">
+				<bounds x="648" y="414" width="32" height="64" />
+				<color alpha="0.6" />
+			</element>
+			<collection name="Opaque Shifter" visible="no">
+				<element ref="shifter" inputtag="IN0" inputmask="0x10">
+					<bounds x="648" y="414" width="32" height="64" />
+				</element>
+			</collection>
+			<element ref="nothing" clickthrough="no"> <!-- block clickable input -->
+				<bounds x="648" y="414" width="32" height="64" />
+			</element>
+		</collection>
 	</view>
 
-	<view name="Color Overlay">
+	<view name="Color Overlay + Shifter-L Overlay" showpointers="no">
 		<screen index="0">
 			<bounds x="0" y="0" width="640" height="480" />
 		</screen>
-		<overlay name="overlay" element="overlay">
-			<bounds x="0" y="0" width="640" height="480" />
-		</overlay>
+		<collection name="Overlay">
+			<element ref="overlay" blend="multiply">
+				<bounds x="0" y="0" width="640" height="480" />
+			</element>
+		</collection>
+		<collection name="Shifter">
+			<element ref="shifter" inputtag="IN0" inputmask="0x10">
+				<bounds x="2" y="414" width="32" height="64" />
+				<color alpha="0.6" />
+			</element>
+			<collection name="Opaque Shifter" visible="no">
+				<element ref="shifter" inputtag="IN0" inputmask="0x10">
+					<bounds x="2" y="414" width="32" height="64" />
+				</element>
+			</collection>
+			<element ref="nothing" clickthrough="no"> <!-- block clickable input -->
+				<bounds x="2" y="414" width="32" height="64" />
+			</element>
+		</collection>
 	</view>
+
+	<view name="Color Overlay + Shifter-L Off-Screen" showpointers="no">
+		<screen index="0">
+			<bounds x="0" y="0" width="640" height="480" />
+		</screen>
+		<collection name="Overlay">
+			<element ref="overlay" blend="multiply">
+				<bounds x="0" y="0" width="640" height="480" />
+			</element>
+		</collection>
+		<collection name="Shifter">
+			<element ref="shifter" inputtag="IN0" inputmask="0x10">
+				<bounds x="-40" y="414" width="32" height="64" />
+				<color alpha="0.6" />
+			</element>
+			<collection name="Opaque Shifter" visible="no">
+				<element ref="shifter" inputtag="IN0" inputmask="0x10">
+					<bounds x="-40" y="414" width="32" height="64" />
+				</element>
+			</collection>
+			<element ref="nothing" clickthrough="no"> <!-- block clickable input -->
+				<bounds x="-40" y="414" width="32" height="64" />
+			</element>
+		</collection>
+	</view>
+
 </mamelayout>

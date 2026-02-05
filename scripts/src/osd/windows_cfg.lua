@@ -3,15 +3,11 @@
 
 defines {
 	"OSD_WINDOWS",
+	"UNICODE",
+	"_UNICODE",
 	"WIN32_LEAN_AND_MEAN",
 	"NOMINMAX",
 }
-
-configuration { "mingw* or vs*" }
-	defines {
-		"UNICODE",
-		"_UNICODE"
-	}
 
 configuration { "vs*" }
 	flags {
@@ -33,11 +29,12 @@ if _OPTIONS["MODERN_WIN_API"]=="1" then
 	}
 else
 	defines {
-		"_WIN32_WINNT=0x0501",
+		"_WIN32_WINNT=0x0602",
+		"NTDDI_VERSION=0x06000000",
 	}
 end
 
-if _OPTIONS["USE_TAPTUN"]=="1" or _OPTIONS["USE_PCAP"]==1 then
+if _OPTIONS["USE_TAPTUN"]=="1" or _OPTIONS["USE_PCAP"]=="1" then
 	defines {
 		"USE_NETWORK",
 	}

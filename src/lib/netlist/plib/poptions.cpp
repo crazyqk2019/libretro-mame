@@ -1,4 +1,4 @@
-// license:GPL-2.0+
+// license:BSD-3-Clause
 // copyright-holders:Couriersud
 
 #include "poptions.h"
@@ -26,9 +26,8 @@ namespace plib {
 		return 0;
 	}
 
-	int option_bool::parse(const pstring &argument)
+	int option_bool::parse([[maybe_unused]] const pstring &argument)
 	{
-		unused_var(argument);
 		m_val = true;
 		return 0;
 	}
@@ -58,12 +57,12 @@ namespace plib {
 
 	void options::register_option(option_base *opt)
 	{
-		m_opts.push_back(opt);
+		m_options.push_back(opt);
 	}
 
 	void options::check_consistency()
 	{
-		for (auto &opt : m_opts)
+		for (auto &opt : m_options)
 		{
 			auto *o = dynamic_cast<option *>(opt);
 			if (o != nullptr)
@@ -95,14 +94,14 @@ namespace plib {
 
 		for (std::size_t i=1; i < argv.size(); )
 		{
-			putf8string arg(argv[i]);
+			pstring arg(argv[i]);
 			option *opt = nullptr;
-			putf8string opt_arg;
+			pstring opt_arg;
 			bool has_equal_arg = false;
 
 			if (!seen_other_args && plib::startsWith(arg, "--"))
 			{
-				auto v = psplit(arg.substr(2),"=");
+				auto v = psplit(arg.substr(2),'=');
 				if (!v.empty() && !v[0].empty())
 				{
 					opt = getopt_long(v[0]);
@@ -171,13 +170,13 @@ namespace plib {
 	pstring options::split_paragraphs(const pstring &text, unsigned width, unsigned indent,
 			unsigned firstline_indent, const pstring &line_end)
 	{
-		auto paragraphs = psplit(text,"\n");
+		auto paragraphs = psplit(text,'\n');
 		pstring ret("");
 
 		for (auto &p : paragraphs)
 		{
 			pstring line = plib::rpad(pstring(""), pstring(" "), firstline_indent);
-			for (auto &s : psplit(p, " "))
+			for (auto &s : psplit(p, ' '))
 			{
 				if (line.length() + s.length() > width)
 				{
@@ -201,7 +200,7 @@ namespace plib {
 		ret = split_paragraphs(description, width, 0, 0) + "\n\n";
 		ret += "Usage:\t" + usage + "\n\nOptions:\n\n";
 
-		for (const auto & optbase : m_opts )
+		for (const auto & optbase : m_options )
 		{
 			// Skip anonymous inputs which are collected in option_args
 			if (dynamic_cast<option_args *>(optbase) != nullptr)
@@ -254,7 +253,7 @@ namespace plib {
 		}
 		// FIXME: other help ...
 		pstring ex("");
-		for (const auto & optbase : m_opts )
+		for (const auto & optbase : m_options )
 		{
 			if (auto *example = dynamic_cast<option_example *>(optbase))
 			{
@@ -263,7 +262,7 @@ namespace plib {
 				ex += split_paragraphs(example->help(), width, 4, 4) + "\n\n";
 			}
 		}
-		if (ex.length() > 0)
+		if (!ex.empty())
 		{
 			ret += "\n\nExamples:\n\n" + ex;
 		}
@@ -272,7 +271,7 @@ namespace plib {
 
 	option *options::getopt_short(const pstring &arg) const
 	{
-		for (const auto & optbase : m_opts)
+		for (const auto & optbase : m_options)
 		{
 			auto *opt = dynamic_cast<option *>(optbase);
 			if (opt != nullptr && !arg.empty() && opt->short_opt() == arg)
@@ -282,7 +281,7 @@ namespace plib {
 	}
 	option *options::getopt_long(const pstring &arg) const
 	{
-		for (const auto & optbase : m_opts)
+		for (const auto & optbase : m_options)
 		{
 			auto *opt = dynamic_cast<option *>(optbase);
 			if (opt != nullptr && !arg.empty() && opt->long_opt() == arg)

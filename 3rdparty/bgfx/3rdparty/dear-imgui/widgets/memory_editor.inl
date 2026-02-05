@@ -1,3 +1,5 @@
+#include <bx/string.h>
+
 #ifdef _MSC_VER
 #   define snprintf _snprintf
 #endif
@@ -38,7 +40,8 @@ namespace ImGui
 
         float line_height = GetTextLineHeight();
         int line_total_count = (int)((mem_size + Rows-1) / Rows);
-        ImGuiListClipper clipper(line_total_count, line_height);
+        ImGuiListClipper clipper;
+        clipper.Begin(line_total_count, line_height);
         int visible_start_addr = clipper.DisplayStart * Rows;
         int visible_end_addr = clipper.DisplayEnd * Rows;
 
@@ -52,10 +55,10 @@ namespace ImGui
         int data_editing_addr_backup = DataEditingAddr;
         if (DataEditingAddr != -1)
         {
-            if (IsKeyPressed(GetKeyIndex(ImGuiKey_UpArrow)) && DataEditingAddr >= Rows)                    { DataEditingAddr -= Rows; DataEditingTakeFocus = true; }
-            else if (IsKeyPressed(GetKeyIndex(ImGuiKey_DownArrow))  && DataEditingAddr < mem_size - Rows)  { DataEditingAddr += Rows; DataEditingTakeFocus = true; }
-            else if (IsKeyPressed(GetKeyIndex(ImGuiKey_LeftArrow))  && DataEditingAddr > 0)                { DataEditingAddr -= 1;    DataEditingTakeFocus = true; }
-            else if (IsKeyPressed(GetKeyIndex(ImGuiKey_RightArrow)) && DataEditingAddr < mem_size - 1)     { DataEditingAddr += 1;    DataEditingTakeFocus = true; }
+            if (IsKeyPressed(ImGuiKey_UpArrow) && DataEditingAddr >= Rows)                    { DataEditingAddr -= Rows; DataEditingTakeFocus = true; }
+            else if (IsKeyPressed(ImGuiKey_DownArrow)  && DataEditingAddr < mem_size - Rows)  { DataEditingAddr += Rows; DataEditingTakeFocus = true; }
+            else if (IsKeyPressed(ImGuiKey_LeftArrow)  && DataEditingAddr > 0)                { DataEditingAddr -= 1;    DataEditingTakeFocus = true; }
+            else if (IsKeyPressed(ImGuiKey_RightArrow) && DataEditingAddr < mem_size - 1)     { DataEditingAddr += 1;    DataEditingTakeFocus = true; }
         }
 
         if ((DataEditingAddr / Rows) != (data_editing_addr_backup / Rows))
@@ -109,7 +112,7 @@ namespace ImGui
                     }
 
                     PushItemWidth(CalcTextSize("FF").x);
-                    ImGuiInputTextFlags flags = ImGuiInputTextFlags_CharsHexadecimal|ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll|ImGuiInputTextFlags_NoHorizontalScroll|ImGuiInputTextFlags_AlwaysInsertMode|ImGuiInputTextFlags_CallbackAlways;
+                    ImGuiInputTextFlags flags = ImGuiInputTextFlags_CharsHexadecimal|ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll|ImGuiInputTextFlags_NoHorizontalScroll|ImGuiInputTextFlags_AlwaysOverwrite|ImGuiInputTextFlags_CallbackAlways;
                     if (InputText("##data", DataInput, 32, flags, FuncHolder::Callback, &cursor_pos))
                     {
                         data_write = data_next = true;
@@ -141,7 +144,7 @@ namespace ImGui
                     if (HexII)
                     {
                         unsigned char byte = mem_data[addr];
-                        if (isprint(byte) )
+                        if (bx::isPrint(byte) )
                         {
                             Text(".%c ", byte);
                         }
@@ -204,7 +207,7 @@ namespace ImGui
 
         AlignTextToFramePadding();
         PushItemWidth(50);
-        PushAllowKeyboardFocus(false);
+        PushItemFlag(ImGuiItemFlags_NoTabStop, true);
         int rows_backup = Rows;
         if (DragInt("##rows", &Rows, 0.2f, 4, 32, "%.0f rows"))
         {
@@ -213,7 +216,7 @@ namespace ImGui
             SetWindowSize(new_window_size);
         }
 
-        PopAllowKeyboardFocus();
+        PopItemFlag();
         PopItemWidth();
         SameLine();
         Text("Range %0*x..%0*x", addr_digits_count, (int)base_display_addr, addr_digits_count, (int)base_display_addr+mem_size-1);

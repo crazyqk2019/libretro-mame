@@ -56,24 +56,24 @@ DEFINE_DEVICE_TYPE(OKIM6295, okim6295_device, "okim6295", "OKI MSM6295 ADPCM")
 // volume lookup table. The manual lists only 9 steps, ~3dB per step. Given the dB values,
 // that seems to map to a 5-bit volume control. Any volume parameter beyond the 9th index
 // results in silent playback.
-const uint8_t okim6295_device::s_volume_table[16] =
+const sound_stream::sample_t okim6295_device::s_volume_table[16] =
 {
-	0x20,   //   0 dB
-	0x16,   //  -3.2 dB
-	0x10,   //  -6.0 dB
-	0x0b,   //  -9.2 dB
-	0x08,   // -12.0 dB
-	0x06,   // -14.5 dB
-	0x04,   // -18.0 dB
-	0x03,   // -20.5 dB
-	0x02,   // -24.0 dB
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
+	sound_stream::sample_t(0x20) / sound_stream::sample_t(0x20),   //   0 dB
+	sound_stream::sample_t(0x16) / sound_stream::sample_t(0x20),   //  -3.2 dB
+	sound_stream::sample_t(0x10) / sound_stream::sample_t(0x20),   //  -6.0 dB
+	sound_stream::sample_t(0x0b) / sound_stream::sample_t(0x20),   //  -9.2 dB
+	sound_stream::sample_t(0x08) / sound_stream::sample_t(0x20),   // -12.0 dB
+	sound_stream::sample_t(0x06) / sound_stream::sample_t(0x20),   // -14.5 dB
+	sound_stream::sample_t(0x04) / sound_stream::sample_t(0x20),   // -18.0 dB
+	sound_stream::sample_t(0x03) / sound_stream::sample_t(0x20),   // -20.5 dB
+	sound_stream::sample_t(0x02) / sound_stream::sample_t(0x20),   // -24.0 dB
+	sound_stream::sample_t(0x00) / sound_stream::sample_t(0x20),
+	sound_stream::sample_t(0x00) / sound_stream::sample_t(0x20),
+	sound_stream::sample_t(0x00) / sound_stream::sample_t(0x20),
+	sound_stream::sample_t(0x00) / sound_stream::sample_t(0x20),
+	sound_stream::sample_t(0x00) / sound_stream::sample_t(0x20),
+	sound_stream::sample_t(0x00) / sound_stream::sample_t(0x20),
+	sound_stream::sample_t(0x00) / sound_stream::sample_t(0x20),
 };
 
 
@@ -85,14 +85,14 @@ const uint8_t okim6295_device::s_volume_table[16] =
 //  okim6295_device - constructor
 //-------------------------------------------------
 
-okim6295_device::okim6295_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, OKIM6295, tag, owner, clock),
-		device_sound_interface(mconfig, *this),
-		device_rom_interface(mconfig, *this),
-		m_region(*this, DEVICE_SELF),
-		m_command(-1),
-		m_stream(nullptr),
-		m_pin7_state(~uint8_t(0))
+okim6295_device::okim6295_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+	device_t(mconfig, OKIM6295, tag, owner, clock),
+	device_sound_interface(mconfig, *this),
+	device_rom_interface(mconfig, *this),
+	m_region(*this, DEVICE_SELF),
+	m_command(-1),
+	m_stream(nullptr),
+	m_pin7_state(~uint8_t(0))
 {
 }
 
@@ -118,7 +118,7 @@ void okim6295_device::device_start()
 
 	// create the stream
 	int divisor = m_pin7_state ? 132 : 165;
-	m_stream = machine().sound().stream_alloc(*this, 0, 1, clock() / divisor);
+	m_stream = stream_alloc(0, 1, clock() / divisor);
 
 	save_item(NAME(m_command));
 	save_item(NAME(m_pin7_state));
@@ -171,26 +171,24 @@ void okim6295_device::device_clock_changed()
 
 
 //-------------------------------------------------
-//  stream_generate - handle update requests for
+//  sound_stream_update - handle update requests for
 //  our sound stream
 //-------------------------------------------------
 
-void okim6295_device::sound_stream_update(sound_stream &stream, stream_sample_t **inputs, stream_sample_t **outputs, int samples)
+void okim6295_device::sound_stream_update(sound_stream &stream)
 {
-	// reset the output stream
-	memset(outputs[0], 0, samples * sizeof(*outputs[0]));
-
 	// iterate over voices and accumulate sample data
 	for (auto & elem : m_voice)
-		elem.generate_adpcm(*this, outputs[0], samples);
+		elem.generate_adpcm(*this, stream);
 }
 
 
 //-------------------------------------------------
-//  rom_bank_updated - the rom bank has changed
+//  rom_bank_pre_change - refresh the stream if the
+//  ROM banking changes
 //-------------------------------------------------
 
-void okim6295_device::rom_bank_updated()
+void okim6295_device::rom_bank_pre_change()
 {
 	m_stream->update();
 }
@@ -322,12 +320,12 @@ void okim6295_device::write(uint8_t command)
 //  okim_voice - constructor
 //-------------------------------------------------
 
-okim6295_device::okim_voice::okim_voice()
-	: m_playing(false),
-		m_base_offset(0),
-		m_sample(0),
-		m_count(0),
-		m_volume(0)
+okim6295_device::okim_voice::okim_voice() :
+	m_playing(false),
+	m_base_offset(0),
+	m_sample(0),
+	m_count(0),
+	m_volume(0)
 {
 }
 
@@ -337,21 +335,21 @@ okim6295_device::okim_voice::okim_voice()
 //  add them to an output stream
 //-------------------------------------------------
 
-void okim6295_device::okim_voice::generate_adpcm(device_rom_interface &rom, stream_sample_t *buffer, int samples)
+void okim6295_device::okim_voice::generate_adpcm(device_rom_interface &rom, sound_stream &stream)
 {
 	// skip if not active
 	if (!m_playing)
 		return;
 
 	// loop while we still have samples to generate
-	while (samples-- != 0)
+	for (int sampindex = 0; sampindex < stream.samples(); sampindex++)
 	{
 		// fetch the next sample byte
 		int nibble = rom.read_byte(m_base_offset + m_sample / 2) >> (((m_sample & 1) << 2) ^ 4);
 
 		// output to the buffer, scaling by the volume
-		// signal in range -2048..2047, volume in range 2..32 => signal * volume / 2 in range -32768..32767
-		*buffer++ += m_adpcm.clock(nibble) * m_volume / 2;
+		// signal in range -2048..2047
+		stream.add_int(0, sampindex, m_adpcm.clock(nibble) * m_volume, 2048);
 
 		// next!
 		if (++m_sample >= m_count)
